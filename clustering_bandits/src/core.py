@@ -21,7 +21,7 @@ class Core:
         else:
             for arg in args:
                 result = self.helper(arg)
-                # result[0] list of rewards and rewards is list of lists
+                # result[0] list of rewards
                 rewards.append(result[0])
                 a_hists.append(result[1])
         return np.array(rewards), np.array(a_hists)

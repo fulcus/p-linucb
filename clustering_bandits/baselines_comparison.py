@@ -3,7 +3,7 @@ os.environ['PYTHONWARNINGS'] = 'ignore::RuntimeWarning'
 
 if __name__ == '__main__':
     from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent
-    from src.environment import Environment, LinearEnvironment
+    from src.environment import LinearEnvironment
     from src.core import Core
     import matplotlib.pyplot as plt
     import numpy as np
@@ -25,7 +25,7 @@ if __name__ == '__main__':
         f = open(f'clustering_bandits/test/input/testcase_{testcase_id}.json')
         param_dict = json.load(f)
         print(f'Parameters: {param_dict}')
-        
+
         # list to np.array
         for k, v in param_dict.items():
             if type(v) == list:
@@ -37,10 +37,12 @@ if __name__ == '__main__':
         # Clairvoyant
         print('Training Clairvoyant algorithm')
         clrv = 'Clairvoyant'
-        env = Environment(n_rounds=param_dict["horizon"], exp_reward=param_dict['exp_reward'],
-                          noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        agent = Clairvoyant(n_arms=param_dict["n_actions"], exp_reward=param_dict['exp_reward'])
+        env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
+                                noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
+        agent = Clairvoyant(
+            n_arms=param_dict["n_actions"], actions=param_dict["actions"], exp_reward=param_dict['exp_reward'])
         core = Core(env, agent)
+        # rewards, actions
         clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         clairvoyant_logs = clairvoyant_logs[:, 1:]
@@ -50,9 +52,10 @@ if __name__ == '__main__':
 
         # UCB1
         print('Training UCB1 Algorithm')
-        env = Environment(n_rounds=param_dict["horizon"], exp_reward=param_dict['exp_reward'],
-                          noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        agent = UCB1Agent(param_dict["n_actions"], max_reward=max_reward)
+        env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
+                                noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
+        agent = UCB1Agent(param_dict["n_actions"],
+                          param_dict["actions"], max_reward=max_reward)
         core = Core(env, agent)
         logs['UCB1'], a_hists['UCB1'] = core.simulation(
             n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
@@ -71,10 +74,13 @@ if __name__ == '__main__':
 
         # Regrets computing
         print('Computing regrets...')
+        clairvoyant_logs = clairvoyant_logs.astype(np.float64)
+
         regret = {label: np.inf *
                   np.ones((param_dict['n_epochs'], param_dict["horizon"])) for label in logs.keys()}
         for i in range(param_dict['n_epochs']):
             for label in regret.keys():
+                logs[label] = logs[label].astype(np.float64)
                 regret[label][i, :] = clairvoyant_logs[i, :] - \
                     logs[label][i, :]
 
@@ -82,9 +88,6 @@ if __name__ == '__main__':
         x = np.arange(1, param_dict["horizon"]+1, step=250)
         f, ax = plt.subplots(3, figsize=(20, 30))
         sqrtn = np.sqrt(param_dict['n_epochs'])
-
-        clairvoyant_logs = clairvoyant_logs.astype(np.float64)
-        logs[label] = logs[label].astype(np.float64)
 
         ax[0].plot(x, np.mean(clairvoyant_logs.T, axis=1)
                    [x], label=clrv, color='C0')
@@ -120,7 +123,6 @@ if __name__ == '__main__':
         plt.savefig(out_folder + f"png/testcase_{testcase_id}_all.png")
 
         #  cumulative regret plot
-
         x = np.arange(1, param_dict["horizon"]+50, step=50)
         x[-1] = min(x[-1],
                     len(np.mean(np.cumsum(regret['UCB1'].T, axis=0), axis=1))-1)
@@ -145,6 +147,7 @@ if __name__ == '__main__':
             np.sum(regret[label].T, axis=0)) for label in regret.keys()}
 
         # action history plots
+        """
         n_actions = param_dict["n_actions"]
         f, ax = plt.subplots(3, 2, figsize=(20, 30))
 
@@ -159,7 +162,6 @@ if __name__ == '__main__':
         plt.savefig(out_folder + f"png/testcase_{testcase_id}_a_hist.png")
 
         f, ax = plt.subplots(3, 2, figsize=(20, 30))
-
         for ax_, label in zip(f.axes, a_hists.keys()):
             bins = np.arange(n_actions+1) - 0.5
             ax_.plot(a_hists[label][-1, :])
@@ -167,7 +169,8 @@ if __name__ == '__main__':
 
         # tikz.save(out_folder + f"tex/testcase_{testcase_id}_a_hist_temp.tex")
         plt.savefig(out_folder + f"png/testcase_{testcase_id}_a_hist_temp.png")
-
+        """
+        
     out_file = open(out_folder + f"logs.json", "w")
     json.dump(final_logs, out_file, indent=4)
     out_file.close()

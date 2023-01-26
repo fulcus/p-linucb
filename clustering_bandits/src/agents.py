@@ -8,7 +8,6 @@ class Agent(ABC):
         self.n_arms = n_arms
         self.t = 0
         self.a_hist = []
-        self.rewards = [[] for _ in range(self.n_arms)]
         self.last_pull = None
         np.random.seed(random_state)
         self.randgen = Random(random_state)
@@ -18,20 +17,43 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def update(self, X, *args, **kwargs):
+    def update(self, reward, *args, **kwargs):
         pass
 
     def reset(self):
         self.t = 0
         self.a_hist = []
-        self.rewards = [[] for _ in range(self.n_arms)]
         self.last_pull = None
 
 
+class Clairvoyant(Agent):
+    """Agent that knows the expected reward vector, and therefore always pull the optimal arm"""
+
+    def __init__(self, n_arms, actions, exp_reward, random_state=1):
+        super().__init__(n_arms, random_state)
+        self.exp_reward = exp_reward
+        self.action_idx = {i: a for i, a in enumerate(actions)}
+        self.reset()
+
+    def reset(self):
+        super().reset()
+        return self
+
+    def pull_arm(self):
+        i_a = np.argmax(self.exp_reward)
+        self.last_pull = self.action_idx[i_a]
+        self.a_hist.append(self.last_pull)
+        return self.last_pull
+
+    def update(self, reward):
+        self.t += 1
+
+
 class UCB1Agent(Agent):
-    def __init__(self, n_arms, max_reward=1, random_state=1):
+    def __init__(self, n_arms, actions, max_reward=1, random_state=1):
         super().__init__(n_arms, random_state)
         self.max_reward = max_reward
+        self.action_idx = {i: a for i, a in enumerate(actions)}
         self.reset()
 
     def reset(self):
@@ -43,38 +65,15 @@ class UCB1Agent(Agent):
     def pull_arm(self):
         ucb1 = [self.avg_reward[a] + self.max_reward *
                 np.sqrt(2 * np.log(self.t) / self.n_pulls[a]) for a in range(self.n_arms)]
-        self.last_pull = np.argmax(ucb1)
-        self.n_pulls[self.last_pull] += 1
+        self.idx_last_pull = np.argmax(ucb1)
+        self.n_pulls[self.idx_last_pull] += 1
+        self.last_pull = self.action_idx[self.idx_last_pull]
         self.a_hist.append(self.last_pull)
         return self.last_pull
 
     def update(self, reward):
-        self.rewards[self.last_pull].append(reward)
-        self.avg_reward[self.last_pull] = (
-            self.avg_reward[self.last_pull] * self.n_pulls[self.last_pull] + reward) / (self.n_pulls[self.last_pull] + 1)
-        self.t += 1
-
-
-class Clairvoyant(Agent):
-    """Agent that knows the expected reward vector, and therefore always pull the optimal arm"""
-
-    def __init__(self, n_arms, exp_reward, random_state=1):
-        super().__init__(n_arms, random_state)
-        self.exp_reward = exp_reward
-        self.reset()
-
-    def reset(self):
-        super().reset()
-        self.rewards = [[] for _ in range(self.n_arms)]
-        return self
-
-    def pull_arm(self):
-        self.last_pull = np.argmax(self.exp_reward)
-        self.a_hist.append(self.last_pull)
-        return self.last_pull
-
-    def update(self, reward):
-        self.rewards[self.last_pull].append(reward)
+        self.avg_reward[self.idx_last_pull] = (
+            self.avg_reward[self.idx_last_pull] * self.n_pulls[self.idx_last_pull] + reward) / (self.n_pulls[self.idx_last_pull] + 1)
         self.t += 1
 
 
@@ -86,7 +85,6 @@ class LinUCBAgent(Agent):
         self.action_dim = actions.shape[1]
         super().__init__(n_arms=self.n_arms, random_state=random_state)
         self.actions = actions
-        self.action_idx = {tuple(a): i for i, a in enumerate(actions)}
         self.lmbd = lmbd
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
@@ -116,21 +114,19 @@ class LinUCBAgent(Agent):
         self.V_t = self.V_t + (self.last_pull @ self.last_pull.T)
         self.b_vect = self.b_vect + self.last_pull * reward
         self.hat_h_vect = np.linalg.inv(self.V_t) @ self.b_vect
-        idx = self.action_idx[tuple(self.last_pull.flatten())]
-        self.rewards[idx].append(reward)
         self.t += 1
 
     def _beta_t_fun_linucb(self):
         return self.max_theta_norm * np.sqrt(self.lmbd) + \
-               np.sqrt(
-                   2 * np.log(self.horizon) + (
-                           self.action_dim * np.log(
-                       (self.action_dim * self.lmbd +
-                        self.horizon * (self.max_action_norm ** 2)
-                        ) / (self.action_dim * self.lmbd)
-                   )
-                   )
-               )
+            np.sqrt(
+            2 * np.log(self.horizon) + (
+                self.action_dim * np.log(
+                    (self.action_dim * self.lmbd +
+                     self.horizon * (self.max_action_norm ** 2)
+                     ) / (self.action_dim * self.lmbd)
+                )
+            )
+        )
 
     def _estimate_linucb_action(self):
         bound = self._beta_t_fun_linucb()
