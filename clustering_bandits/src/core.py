@@ -2,6 +2,8 @@ import numpy as np
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor
 
+from clustering_bandits.src.environment import ContextualLinearEnvironment
+
 
 class Core:
     def __init__(self, environment, agent):
@@ -31,7 +33,11 @@ class Core:
 
     def epoch(self, agent, environment, n_rounds=10):
         for _ in range(n_rounds):
-            new_a = agent.pull_arm()
+            if isinstance(environment, ContextualLinearEnvironment):
+                x = environment.get_context()
+                new_a = agent.pull_arm(x)
+            else:
+                new_a = agent.pull_arm()
             environment.round(new_a)
             agent.update(
                 environment.rewards[-1])

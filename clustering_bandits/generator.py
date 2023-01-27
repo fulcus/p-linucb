@@ -7,7 +7,7 @@ def generate_linear(seed=0, n_actions=5):
     """exp_reward = theta * action"""
     actions = np.eye(n_actions)
     theta = np.random.uniform(-1.0, 1.0, size=(1, n_actions))
-    exp_reward = np.dot(theta, actions)
+    exp_reward = theta @ actions
     max_action_norm = 1  # standard basis
     max_theta_norm = np.linalg.norm(theta)
     params = {
