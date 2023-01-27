@@ -147,7 +147,6 @@ if __name__ == '__main__':
             np.sum(regret[label].T, axis=0)) for label in regret.keys()}
 
         # action history plots
-        """
         n_actions = param_dict["n_actions"]
         f, ax = plt.subplots(3, 2, figsize=(20, 30))
 
@@ -169,8 +168,7 @@ if __name__ == '__main__':
 
         # tikz.save(out_folder + f"tex/testcase_{testcase_id}_a_hist_temp.tex")
         plt.savefig(out_folder + f"png/testcase_{testcase_id}_a_hist_temp.png")
-        """
-        
+
     out_file = open(out_folder + f"logs.json", "w")
     json.dump(final_logs, out_file, indent=4)
     out_file.close()

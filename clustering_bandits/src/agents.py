@@ -32,7 +32,7 @@ class Clairvoyant(Agent):
     def __init__(self, n_arms, actions, exp_reward, random_state=1):
         super().__init__(n_arms, random_state)
         self.exp_reward = exp_reward
-        self.action_idx = {i: a for i, a in enumerate(actions)}
+        self.idx_action = {i: a for i, a in enumerate(actions)}
         self.reset()
 
     def reset(self):
@@ -41,8 +41,8 @@ class Clairvoyant(Agent):
 
     def pull_arm(self):
         i_a = np.argmax(self.exp_reward)
-        self.last_pull = self.action_idx[i_a]
-        self.a_hist.append(self.last_pull)
+        self.last_pull = self.idx_action[i_a]
+        self.a_hist.append(i_a)
         return self.last_pull
 
     def update(self, reward):
@@ -53,7 +53,7 @@ class UCB1Agent(Agent):
     def __init__(self, n_arms, actions, max_reward=1, random_state=1):
         super().__init__(n_arms, random_state)
         self.max_reward = max_reward
-        self.action_idx = {i: a for i, a in enumerate(actions)}
+        self.idx_action = {i: a for i, a in enumerate(actions)}
         self.reset()
 
     def reset(self):
@@ -67,8 +67,8 @@ class UCB1Agent(Agent):
                 np.sqrt(2 * np.log(self.t) / self.n_pulls[a]) for a in range(self.n_arms)]
         self.idx_last_pull = np.argmax(ucb1)
         self.n_pulls[self.idx_last_pull] += 1
-        self.last_pull = self.action_idx[self.idx_last_pull]
-        self.a_hist.append(self.last_pull)
+        self.last_pull = self.idx_action[self.idx_last_pull]
+        self.a_hist.append(self.idx_last_pull)
         return self.last_pull
 
     def update(self, reward):
@@ -89,6 +89,7 @@ class LinUCBAgent(Agent):
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
         self.max_action_norm = max_action_norm
+        self.action_idx = {tuple(a): i for i, a in enumerate(actions)}
         self.reset()
 
     def reset(self):
@@ -107,7 +108,8 @@ class LinUCBAgent(Agent):
         else:
             u_t, _ = self._estimate_linucb_action()
             self.last_pull = u_t.reshape(self.action_dim, 1)
-        self.a_hist.append(self.last_pull)
+        i_a = self.action_idx[tuple(self.last_pull.squeeze())]
+        self.a_hist.append(i_a)
         return self.last_pull
 
     def update(self, reward):

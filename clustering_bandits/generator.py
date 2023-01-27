@@ -19,7 +19,6 @@ if __name__ == '__main__':
     max_theta_norm = np.linalg.norm(theta)
     params = {
     "seed": seed,
-    "exp_reward": exp_reward.tolist(),
     "actions": actions.tolist(),
     "n_actions": actions.shape[1],
     "theta": theta.tolist(),
