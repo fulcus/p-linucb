@@ -2,8 +2,8 @@ import os
 os.environ['PYTHONWARNINGS'] = 'ignore::RuntimeWarning'
 
 if __name__ == '__main__':
-    from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent
-    from src.environment import LinearEnvironment
+    from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ProductLinUCBAgent
+    from src.environment import LinearEnvironment, ProductEnvironment
     from src.core import Core
     import matplotlib.pyplot as plt
     import numpy as np
@@ -35,14 +35,15 @@ if __name__ == '__main__':
         a_hists = {}
 
         # Clairvoyant
-        print('Training Clairvoyant algorithm')
+        print('Training Clairvoyant Algorithm')
         clrv = 'Clairvoyant'
-        env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
-                                noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        agent = Clairvoyant(
-            n_arms=param_dict["n_actions"], actions=param_dict["actions"], exp_reward=param_dict['exp_reward'])
+        # env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
+        #                         noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
+        env = ProductEnvironment(n_rounds=param_dict["horizon"], contexts=param_dict["contexts"],
+                                 theta=param_dict["theta"], theta_p=param_dict["theta_p"], noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
+        agent = Clairvoyant(contexts=param_dict["contexts"], arms=param_dict["arms"], theta=param_dict["theta"], theta_p=param_dict["theta_p"])
         core = Core(env, agent)
-        # rewards, actions
+        # rewards, arms
         clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         clairvoyant_logs = clairvoyant_logs[:, 1:]
@@ -54,8 +55,8 @@ if __name__ == '__main__':
         print('Training UCB1 Algorithm')
         env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
                                 noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        agent = UCB1Agent(param_dict["n_actions"],
-                          param_dict["actions"], max_reward=max_reward)
+        agent = UCB1Agent(
+            param_dict["arms"], max_reward=max_reward, random_state=param_dict['seed'])
         core = Core(env, agent)
         logs['UCB1'], a_hists['UCB1'] = core.simulation(
             n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
@@ -65,12 +66,24 @@ if __name__ == '__main__':
         print('Training LinUCB Algorithm')
         env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
                                 noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        agent = LinUCBAgent(param_dict["actions"], param_dict["horizon"], lmbd=1,
-                            max_theta_norm=param_dict["n_actions"], max_action_norm=1.5)
+        agent = LinUCBAgent(param_dict["arms"], param_dict["horizon"], lmbd=1,
+                            max_theta_norm=param_dict["max_theta_norm"],
+                            max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
         core = Core(env, agent)
         logs['LinUCB'], a_hists['LinUCB'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         logs['LinUCB'] = logs['LinUCB'][:, 1:]
+
+        # ProductLinUCB
+        print('Training ProductLinUCB Algorithm')
+        env = ProductEnvironment(n_rounds=param_dict["horizon"], contexts=param_dict["contexts"], theta=param_dict["theta"],
+                                 theta_p=param_dict["theta_p"], noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
+        agent = ProductLinUCBAgent(param_dict["contexts"], param_dict["arms"], param_dict["horizon"], lmbd=1,
+                                   max_theta_norm=param_dict["max_theta_norm"], max_arm_norm=param_dict["max_arm_norm"])
+        core = Core(env, agent)
+        logs['ProductLinUCB'], a_hists['ProductLinUCB'] = core.simulation(
+            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
+        logs['ProductLinUCB'] = logs['ProductLinUCB'][:, 1:]
 
         # Regrets computing
         print('Computing regrets...')
@@ -146,15 +159,15 @@ if __name__ == '__main__':
         final_logs[f'testcase_{testcase_id}'] = {label: np.mean(
             np.sum(regret[label].T, axis=0)) for label in regret.keys()}
 
-        # action history plots
-        n_actions = param_dict["n_actions"]
+        # arm history plots
+        n_arms = param_dict["n_arms"]
         f, ax = plt.subplots(3, 2, figsize=(20, 30))
 
         for ax_, label in zip(f.axes, a_hists.keys()):
-            bins = np.arange(n_actions+1) - 0.5
+            bins = np.arange(n_arms+1) - 0.5
             ax_.hist(a_hists[label].flatten(), bins=bins)
-            ax_.set_xticks(range(n_actions))
-            ax_.set_xlim(-1, n_actions)
+            ax_.set_xticks(range(n_arms))
+            ax_.set_xlim(-1, n_arms)
             ax_.set_title(label)
 
         tikz.save(out_folder + f"tex/testcase_{testcase_id}_a_hist.tex")
@@ -162,7 +175,7 @@ if __name__ == '__main__':
 
         f, ax = plt.subplots(3, 2, figsize=(20, 30))
         for ax_, label in zip(f.axes, a_hists.keys()):
-            bins = np.arange(n_actions+1) - 0.5
+            bins = np.arange(n_arms+1) - 0.5
             ax_.plot(a_hists[label][-1, :])
             ax_.set_title(label)
 

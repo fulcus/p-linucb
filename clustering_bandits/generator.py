@@ -3,20 +3,49 @@ import numpy as np
 import json
 
 
-def generate_linear(seed=0, n_actions=5):
-    """exp_reward = theta * action"""
-    actions = np.eye(n_actions)
-    theta = np.random.uniform(-1.0, 1.0, size=(1, n_actions))
-    exp_reward = theta @ actions
-    max_action_norm = 1  # standard basis
+def generate_linear_bandits(seed=0, n_arms=5):
+    """exp_reward = theta * arm"""
+    arms = np.eye(n_arms)
+    theta = np.random.uniform(-1.0, 1.0, size=(1, n_arms))
+    exp_reward = theta @ arms
+    max_arm_norm = 1  # standard basis
     max_theta_norm = np.linalg.norm(theta)
     params = {
         "seed": seed,
-        "actions": actions.tolist(),
-        "n_actions": actions.shape[1],
+        "arms": arms.tolist(),
+        "n_arms": arms.shape[1],
         "theta": theta.tolist(),
         "exp_reward": exp_reward.tolist(),
-        "max_action_norm": max_action_norm,
+        "max_arm_norm": max_arm_norm,
+        "max_theta_norm": max_theta_norm,
+        "horizon": 1000,
+        "n_epochs": 10,
+        "noise_std": 0.01,
+    }
+    return params
+
+
+def generate_product_bandits(seed=0, n_arms=5, n_contexts=10):
+    """exp_reward = theta * psi(arm, context) + theta_p[context] * psi(arm, context)"""
+    dim_arm = n_arms
+    arms = np.eye(n_arms)
+    contexts = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
+    theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
+    theta = np.random.uniform(-1.0, 1.0, size=(1, dim_arm))
+    
+    # TODO with psi later 
+    # not working: theta_p depends on context at t
+
+    max_arm_norm = 1  # standard basis
+    max_theta_norm = np.linalg.norm(theta)
+    params = {
+        "seed": seed,
+        "contexts": contexts.tolist(),
+        "theta_p": theta_p.tolist(),
+        "arms": arms.tolist(),
+        "n_arms": arms.shape[1],
+        "theta": theta.tolist(),
+        "max_arm_norm": max_arm_norm,
         "max_theta_norm": max_theta_norm,
         "horizon": 1000,
         "n_epochs": 10,
@@ -30,7 +59,8 @@ if __name__ == '__main__':
     os.makedirs(out_folder, exist_ok=True)
     seed = np.random.randint(0, 100)
     np.random.seed(seed)
-    params = generate_linear(seed, n_actions=5)
+    # params = generate_linear_bandits(seed, n_arms=5)
+    params = generate_product_bandits()
     print(f"Generated testcase_{seed} with params:\n{params}")
 
     out_file = open(out_folder + f"testcase_{seed}.json", "w")
