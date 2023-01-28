@@ -10,7 +10,7 @@ class Agent(ABC):
         self.arm_dim = arms.shape[1]
         self.t = 0
         self.a_hist = []
-        self.last_pull = None
+        self.last_pull_i = None
         np.random.seed(random_state)
         self.randgen = Random(random_state)
 
@@ -25,7 +25,7 @@ class Agent(ABC):
     def reset(self):
         self.t = 0
         self.a_hist = []
-        self.last_pull = None
+        self.last_pull_i = None
 
 
 class Clairvoyant(Agent):
@@ -37,7 +37,6 @@ class Clairvoyant(Agent):
         self.contexts = contexts
         self.theta = theta
         self.theta_p = theta_p
-        self.idx_arm = {i: a for i, a in enumerate(arms)}
         if psi is None:
             self.psi = lambda a, x: a
         else:
@@ -58,10 +57,9 @@ class Clairvoyant(Agent):
             for i, arm in enumerate(self.arms):
                 exp_rewards[i] = (self.theta @ self.psi(arm, context)
                                   + self.theta_p[context_i, :] @ self.psi(arm, context))
-        i_a = np.argmax(exp_rewards)
-        self.last_pull = self.idx_arm[i_a]
-        self.a_hist.append(i_a)
-        return self.last_pull
+        self.last_pull_i = np.argmax(exp_rewards)
+        self.a_hist.append(self.last_pull_i)
+        return self.last_pull_i
 
     def update(self, reward):
         self.t += 1
@@ -71,7 +69,6 @@ class UCB1Agent(Agent):
     def __init__(self, arms, max_reward=1, random_state=1):
         super().__init__(arms, random_state)
         self.max_reward = max_reward
-        self.idx_arm = {i: a for i, a in enumerate(arms)}
         self.reset()
 
     def reset(self):
@@ -84,17 +81,16 @@ class UCB1Agent(Agent):
         ucb1 = [self.avg_reward[a] + self.max_reward *
                 np.sqrt(2 * np.log(self.t)
                 / self.n_pulls[a]) for a in range(self.n_arms)]
-        self.idx_last_pull = np.argmax(ucb1)
-        self.n_pulls[self.idx_last_pull] += 1
-        self.last_pull = self.idx_arm[self.idx_last_pull]
-        self.a_hist.append(self.idx_last_pull)
-        return self.last_pull
+        self.last_pull_i = np.argmax(ucb1)
+        self.n_pulls[self.last_pull_i] += 1
+        self.a_hist.append(self.last_pull_i)
+        return self.last_pull_i
 
     def update(self, reward):
-        self.avg_reward[self.idx_last_pull] = ((
-            self.avg_reward[self.idx_last_pull]
-            * self.n_pulls[self.idx_last_pull] + reward)
-            / (self.n_pulls[self.idx_last_pull] + 1))
+        self.avg_reward[self.last_pull_i] = ((
+            self.avg_reward[self.last_pull_i]
+            * self.n_pulls[self.last_pull_i] + reward)
+            / (self.n_pulls[self.last_pull_i] + 1))
         self.t += 1
 
 
@@ -107,7 +103,6 @@ class LinUCBAgent(Agent):
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
-        self.arm_idx = {tuple(a): i for i, a in enumerate(arms)}
         self.reset()
 
     def reset(self):
@@ -119,37 +114,34 @@ class LinUCBAgent(Agent):
         self.first = True
         return self
 
-    def pull_arm(self, arm=None):
-        if arm is not None:
-            self.last_pull = arm
-            i_a = self.arm_idx[tuple(self.last_pull.squeeze())]
-            self.a_hist.append(i_a)
-            return self.last_pull
+    def pull_arm(self, arm_i=None):
+        if arm_i is not None:
+            self.a_hist.append(arm_i)
+            self.last_pull_i = arm_i
+            return self.last_pull_i
 
         if self.first:
-            u_t = self.arms[int(np.random.uniform(high=self.n_arms)), :]
-            self.last_pull = u_t.reshape(self.arm_dim, 1)
+            self.last_pull_i = int(np.random.uniform(high=self.n_arms))
             self.first = False
         else:
-            u_t, _ = self._estimate_linucb_arm()
-            self.last_pull = u_t.reshape(self.arm_dim, 1)
-        i_a = self.arm_idx[tuple(self.last_pull.squeeze())]
-        self.a_hist.append(i_a)
-        return self.last_pull
+            _, self.last_pull_i = self._estimate_linucb_arm()
+        self.a_hist.append(self.last_pull_i)
+        return self.last_pull_i
 
     def update(self, reward):
-        self.V_t = self.V_t + (self.last_pull @ self.last_pull.T)
-        self.b_vect = self.b_vect + self.last_pull * reward
+
+        last_pull = self.arms[self.last_pull_i].reshape(self.arm_dim, 1)
+        self.V_t = self.V_t + (last_pull @ last_pull.T)
+        self.b_vect = self.b_vect + last_pull * reward
         self.theta_hat = np.linalg.inv(self.V_t) @ self.b_vect
         self.t += 1
 
     def _estimate_linucb_arm(self):
         bound = self._beta_t_fun_linucb()
-        # self.last_ucb = np.zeros(self.n_arms)
-        for i, act_i in enumerate(self.arms):
-            act_i = act_i.reshape(self.arm_dim, 1)
-            self.last_ucb[i] = self.theta_hat.T @ act_i + bound * np.sqrt(
-                act_i.T @ np.linalg.inv(self.V_t) @ act_i)
+        for i, arm in enumerate(self.arms):
+            arm = arm.reshape(self.arm_dim, 1)
+            self.last_ucb[i] = (self.theta_hat.T @ arm + bound
+                                * np.sqrt(arm.T @ np.linalg.inv(self.V_t) @ arm))
         return self.arms[np.argmax(self.last_ucb), :], np.argmax(self.last_ucb)
 
     def _beta_t_fun_linucb(self):
@@ -161,6 +153,7 @@ class LinUCBAgent(Agent):
                     / (self.arm_dim * self.lmbd)
                 ))))
 
+# TODO implement contextual linear bandit
 
 class ProductLinUCBAgent(Agent):
     """Combines a global linear bandit and an independent instance per context"""
@@ -173,7 +166,6 @@ class ProductLinUCBAgent(Agent):
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
-        self.arm_idx = {tuple(a): i for i, a in enumerate(arms)}
         self.contexts = contexts
         self.reset()
 
@@ -182,14 +174,14 @@ class ProductLinUCBAgent(Agent):
         self.last_context_i = context_i
         ucb = self.agent_global.last_ucb + \
             self.context_agent[context_i].last_ucb
-        best_arm = self.arms[np.argmax(ucb), :]
-        self.agent_global.pull_arm(best_arm)
-        self.context_agent[context_i].pull_arm(best_arm)
-        self.a_hist.append(best_arm)
-        return best_arm
+        self.last_pull_i = np.argmax(ucb)
+        self.agent_global.pull_arm(self.last_pull_i)
+        self.context_agent[context_i].pull_arm(self.last_pull_i)
+        self.a_hist.append(self.last_pull_i)
+        return self.last_pull_i
 
     def update(self, reward):
-        pred_reward = self.agent_global.theta_hat.T @ self.agent_global.last_pull
+        pred_reward = self.agent_global.theta_hat.T @ self.arms[self.agent_global.last_pull_i]
         residual = reward - pred_reward
         self.context_agent[self.last_context_i].update(residual)
         self.agent_global.update(reward)

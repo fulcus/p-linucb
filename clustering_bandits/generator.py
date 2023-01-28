@@ -7,7 +7,6 @@ def generate_linear_bandits(seed=0, n_arms=5):
     """exp_reward = theta * arm"""
     arms = np.eye(n_arms)
     theta = np.random.uniform(-1.0, 1.0, size=(1, n_arms))
-    exp_reward = theta @ arms
     max_arm_norm = 1  # standard basis
     max_theta_norm = np.linalg.norm(theta)
     params = {
@@ -15,7 +14,6 @@ def generate_linear_bandits(seed=0, n_arms=5):
         "arms": arms.tolist(),
         "n_arms": arms.shape[1],
         "theta": theta.tolist(),
-        "exp_reward": exp_reward.tolist(),
         "max_arm_norm": max_arm_norm,
         "max_theta_norm": max_theta_norm,
         "horizon": 1000,
@@ -32,10 +30,7 @@ def generate_product_bandits(seed=0, n_arms=5, n_contexts=10):
     contexts = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
     theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
     theta = np.random.uniform(-1.0, 1.0, size=(1, dim_arm))
-    
-    # TODO with psi later 
-    # not working: theta_p depends on context at t
-
+    # TODO with psi later
     max_arm_norm = 1  # standard basis
     max_theta_norm = np.linalg.norm(theta)
     params = {
@@ -55,14 +50,13 @@ def generate_product_bandits(seed=0, n_arms=5, n_contexts=10):
 
 
 if __name__ == '__main__':
-    out_folder = f'clustering_bandits/test/input/'
-    os.makedirs(out_folder, exist_ok=True)
     seed = np.random.randint(0, 100)
     np.random.seed(seed)
     # params = generate_linear_bandits(seed, n_arms=5)
     params = generate_product_bandits()
     print(f"Generated testcase_{seed} with params:\n{params}")
 
-    out_file = open(out_folder + f"testcase_{seed}.json", "w")
-    json.dump(params, out_file, indent=4)
-    out_file.close()
+    out_folder = 'clustering_bandits/test/input/'
+    os.makedirs(out_folder, exist_ok=True)
+    with open(out_folder + f"testcase_{seed}.json", "w") as f:
+        json.dump(params, f, indent=4)

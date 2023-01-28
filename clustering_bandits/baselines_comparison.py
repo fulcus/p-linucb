@@ -39,7 +39,7 @@ if __name__ == '__main__':
         clrv = 'Clairvoyant'
         # env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
         #                         noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        env = ProductEnvironment(n_rounds=param_dict["horizon"], contexts=param_dict["contexts"],
+        env = ProductEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], contexts=param_dict["contexts"],
                                  theta=param_dict["theta"], theta_p=param_dict["theta_p"], noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
         agent = Clairvoyant(contexts=param_dict["contexts"], arms=param_dict["arms"], theta=param_dict["theta"], theta_p=param_dict["theta_p"])
         core = Core(env, agent)
@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
         # UCB1
         print('Training UCB1 Algorithm')
-        env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
+        env = LinearEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], theta=param_dict["theta"],
                                 noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
         agent = UCB1Agent(
             param_dict["arms"], max_reward=max_reward, random_state=param_dict['seed'])
@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
         # LinUCB
         print('Training LinUCB Algorithm')
-        env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
+        env = LinearEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], theta=param_dict["theta"],
                                 noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
         agent = LinUCBAgent(param_dict["arms"], param_dict["horizon"], lmbd=1,
                             max_theta_norm=param_dict["max_theta_norm"],
@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
         # ProductLinUCB
         print('Training ProductLinUCB Algorithm')
-        env = ProductEnvironment(n_rounds=param_dict["horizon"], contexts=param_dict["contexts"], theta=param_dict["theta"],
+        env = ProductEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], contexts=param_dict["contexts"], theta=param_dict["theta"],
                                  theta_p=param_dict["theta_p"], noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
         agent = ProductLinUCBAgent(param_dict["contexts"], param_dict["arms"], param_dict["horizon"], lmbd=1,
                                    max_theta_norm=param_dict["max_theta_norm"], max_arm_norm=param_dict["max_arm_norm"])
