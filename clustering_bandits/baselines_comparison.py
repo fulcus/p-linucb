@@ -2,7 +2,7 @@ import os
 os.environ['PYTHONWARNINGS'] = 'ignore::RuntimeWarning'
 
 if __name__ == '__main__':
-    from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ContextualLinUCBAgent, ProductLinUCBAgent
+    from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ContextualLinUCBAgent, INDLinUCBAgent, ProductLinUCBAgent
     from src.environment import LinearEnvironment, ContextualLinearEnvironment, ProductEnvironment
     from src.core import Core
     import matplotlib.pyplot as plt
@@ -37,14 +37,14 @@ if __name__ == '__main__':
         # env = LinearEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], theta=param_dict["theta"],
         #                         noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
         env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["contexts"],
+                                          context_set=param_dict["context_set"],
                                           arms=param_dict["arms"],
                                           theta=param_dict["theta"],
                                           noise_std=param_dict['noise_std'],
                                           random_state=param_dict['seed'])
         # env = ProductEnvironment(n_rounds=param_dict["horizon"],
         #                          arms=param_dict["arms"],
-        #                          contexts=param_dict["contexts"],
+        #                          context_set=param_dict["context_set"],
         #                          theta=param_dict["theta"],
         #                          theta_p=param_dict["theta_p"],
         #                          noise_std=param_dict['noise_std'],
@@ -55,10 +55,10 @@ if __name__ == '__main__':
         agent = Clairvoyant(arms=param_dict["arms"],
                             theta=param_dict["theta"],
                             # theta_p=param_dict["theta_p"],
-                            context_set=param_dict["contexts"]
+                            context_set=param_dict["context_set"]
                             )
         env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["contexts"],
+                                          context_set=param_dict["context_set"],
                                           arms=param_dict["arms"],
                                           theta=param_dict["theta"],
                                           noise_std=param_dict['noise_std'],
@@ -77,7 +77,7 @@ if __name__ == '__main__':
         agent = UCB1Agent(
             param_dict["arms"], max_reward=max_reward, random_state=param_dict['seed'])
         env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["contexts"],
+                                          context_set=param_dict["context_set"],
                                           arms=param_dict["arms"],
                                           theta=param_dict["theta"],
                                           noise_std=param_dict['noise_std'],
@@ -93,7 +93,7 @@ if __name__ == '__main__':
                             max_theta_norm=param_dict["max_theta_norm"],
                             max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
         env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["contexts"],
+                                          context_set=param_dict["context_set"],
                                           arms=param_dict["arms"],
                                           theta=param_dict["theta"],
                                           noise_std=param_dict['noise_std'],
@@ -105,11 +105,11 @@ if __name__ == '__main__':
 
         # ContextualLinUCB
         print('Training ContextualLinUCB Algorithm')
-        agent = ContextualLinUCBAgent(param_dict["arms"], param_dict["contexts"], None, param_dict["horizon"], lmbd=1,
+        agent = ContextualLinUCBAgent(param_dict["arms"], param_dict["context_set"], None, param_dict["horizon"], lmbd=1,
                                       max_theta_norm=param_dict["max_theta_norm"],
                                       max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
         env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["contexts"],
+                                          context_set=param_dict["context_set"],
                                           arms=param_dict["arms"],
                                           theta=param_dict["theta"],
                                           noise_std=param_dict['noise_std'],
@@ -119,10 +119,25 @@ if __name__ == '__main__':
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         logs['ContextualLinUCBAgent'] = logs['ContextualLinUCBAgent'][:, 1:]
 
+        # INDLinUCB
+        print('Training INDLinUCBAgent Algorithm')
+        agent = INDLinUCBAgent(param_dict["arms"], param_dict["context_set"], None, param_dict["horizon"], lmbd=1,
+                               max_theta_norm=param_dict["max_theta_norm"],
+                               max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
+        env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
+                                          context_set=param_dict["context_set"],
+                                          arms=param_dict["arms"],
+                                          theta=param_dict["theta"],
+                                          noise_std=param_dict['noise_std'],
+                                          random_state=param_dict['seed'])
+        core = Core(env, agent)
+        logs['INDLinUCBAgent'], a_hists['INDLinUCBAgent'] = core.simulation(
+            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
+        logs['INDLinUCBAgent'] = logs['INDLinUCBAgent'][:, 1:]
+
         # ProductLinUCB
         # print('Training ProductLinUCB Algorithm')
-        # agent = ProductLinUCBAgent(param_dict["contexts"], param_dict["arms"], param_dict["horizon"], lmbd=1,
-        #                            max_theta_norm=param_dict["max_theta_norm"], max_arm_norm=param_dict["max_arm_norm"])
+        # agent = ProductLinUCBAgent ...
         # env.reset()
         # core = Core(env, agent)
         # logs['ProductLinUCB'], a_hists['ProductLinUCB'] = core.simulation(

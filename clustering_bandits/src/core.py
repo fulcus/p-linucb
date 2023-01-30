@@ -40,5 +40,6 @@ class Core:
             else:
                 new_a = agent.pull_arm()
             environment.round(new_a)
-            agent.update(environment.rewards[-1])
+            agent.update(
+                environment.rewards[-1])
         return (environment.rewards, agent.a_hist)

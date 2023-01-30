@@ -46,7 +46,7 @@ class Clairvoyant(Agent):
         super().reset()
         return self
 
-    def pull_arm(self, context_i=None, arm_i=None):
+    def pull_arm(self, context_i=None):
         exp_rewards = np.zeros(self.n_arms)
         if context_i is None:
             for i, arm in enumerate(self.arms):
@@ -80,7 +80,7 @@ class UCB1Agent(Agent):
         self.n_pulls = np.zeros(self.n_arms)
         return self
 
-    def pull_arm(self, context_i=None, arm_i=None):
+    def pull_arm(self, context_i=None):
         ucb1 = [self.avg_reward[a] + self.max_reward *
                 np.sqrt(2 * np.log(self.t)
                 / self.n_pulls[a]) for a in range(self.n_arms)]
@@ -210,10 +210,10 @@ class ContextualLinUCBAgent(LinUCBAgent):
                 ))))
 
 
-class ProductLinUCBAgent(Agent):
-    """Combines a global linear bandit and an independent instance per context"""
+class INDLinUCBAgent(Agent):
+    """One independent LinUCBAgent instance per context"""
 
-    def __init__(self, context_set, arms, horizon, lmbd,
+    def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm, max_arm_norm, random_state=1):
         super().__init__(arms, random_state)
         self.random_state = random_state
@@ -224,7 +224,43 @@ class ProductLinUCBAgent(Agent):
         self.context_set = context_set
         self.reset()
 
-    def pull_arm(self, context_i, arm_i=None):
+    def pull_arm(self, context_i):
+        """arm = argmax (theta * arm + theta_p * arm)"""
+        self.last_context_i = context_i
+        arm_i = self.context_agent[context_i].pull_arm()
+        self.a_hist.append(arm_i)
+        return arm_i
+
+    def update(self, reward):
+        self.context_agent[self.last_context_i].update(reward)
+
+    def reset(self):
+        super().reset()
+        self.context_agent = [
+            LinUCBAgent(
+                self.arms, self.horizon,
+                self.lmbd, self.max_theta_norm,
+                self.max_arm_norm, self.random_state)
+            for _ in self.context_set
+        ]
+
+
+class ProductLinUCBAgent(Agent):
+    """Combines a global linear bandit and an independent instance per context"""
+    # TODO swap global linucb with contextual
+
+    def __init__(self, arms, context_set, psi, horizon, lmbd,
+                 max_theta_norm, max_arm_norm, random_state=1):
+        super().__init__(arms, random_state)
+        self.random_state = random_state
+        self.lmbd = lmbd
+        self.horizon = horizon
+        self.max_theta_norm = max_theta_norm
+        self.max_arm_norm = max_arm_norm
+        self.context_set = context_set
+        self.reset()
+
+    def pull_arm(self, context_i):
         """arm = argmax (theta * arm + theta_p * arm)"""
         self.last_context_i = context_i
         ucb = self.agent_global.last_ucb + \

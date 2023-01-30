@@ -63,7 +63,8 @@ class ContextualLinearEnvironment(LinearEnvironment):
         self.t = 0
         self.rewards = None
         np.random.seed(self.random_state + i)
-        self.context_indexes = np.random.randint(0, self.context_set.shape[0], self.n_rounds)
+        self.context_indexes = np.random.randint(
+            0, self.context_set.shape[0], self.n_rounds)
         self.noise = np.random.normal(0, self.noise_std, self.n_rounds)
         # self.contexts = np.array([self.context_set[i] for i in indexes])
         return self
