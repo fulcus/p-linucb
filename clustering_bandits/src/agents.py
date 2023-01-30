@@ -29,16 +29,15 @@ class Agent(ABC):
 
 
 class Clairvoyant(Agent):
-    """Agent that knows the expected reward vector, 
-    and therefore always pull the optimal arm"""
+    """Agent that always pulls the optimal arm"""
 
-    def __init__(self, contexts, arms, theta, theta_p, psi=None, random_state=1):
+    def __init__(self, arms, theta, theta_p=None, contexts=None, psi=None, random_state=1):
         super().__init__(arms, random_state)
         self.contexts = contexts
         self.theta = theta
         self.theta_p = theta_p
         if psi is None:
-            self.psi = lambda a, x: a
+            self.psi = lambda a, x: np.multiply(a, x)
         else:
             self.psi = psi
         self.reset()
@@ -47,16 +46,20 @@ class Clairvoyant(Agent):
         super().reset()
         return self
 
-    def pull_arm(self, context_i=None):
+    def pull_arm(self, context_i=None, arm_i=None):
         exp_rewards = np.zeros(self.n_arms)
         if context_i is None:
             for i, arm in enumerate(self.arms):
-                exp_rewards[i] = self.theta @ self.psi(arm, context)
+                exp_rewards[i] = self.theta @ arm
         else:
             context = self.contexts[context_i]
             for i, arm in enumerate(self.arms):
-                exp_rewards[i] = (self.theta @ self.psi(arm, context)
-                                  + self.theta_p[context_i, :] @ self.psi(arm, context))
+                psi = self.psi(arm, context)
+                if self.theta_p is None:
+                    exp_rewards[i] = (self.theta @ psi)
+                else:
+                    exp_rewards[i] = (self.theta @ psi
+                                      + self.theta_p[context_i] @ psi)
         self.last_pull_i = np.argmax(exp_rewards)
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
@@ -77,7 +80,7 @@ class UCB1Agent(Agent):
         self.n_pulls = np.zeros(self.n_arms)
         return self
 
-    def pull_arm(self):
+    def pull_arm(self, context_i=None, arm_i=None):
         ucb1 = [self.avg_reward[a] + self.max_reward *
                 np.sqrt(2 * np.log(self.t)
                 / self.n_pulls[a]) for a in range(self.n_arms)]
@@ -114,7 +117,7 @@ class LinUCBAgent(Agent):
         self.first = True
         return self
 
-    def pull_arm(self, arm_i=None):
+    def pull_arm(self, context_i=None, arm_i=None):
         if arm_i is not None:
             self.a_hist.append(arm_i)
             self.last_pull_i = arm_i
@@ -129,7 +132,6 @@ class LinUCBAgent(Agent):
         return self.last_pull_i
 
     def update(self, reward):
-
         last_pull = self.arms[self.last_pull_i].reshape(self.arm_dim, 1)
         self.V_t = self.V_t + (last_pull @ last_pull.T)
         self.b_vect = self.b_vect + last_pull * reward
@@ -153,7 +155,62 @@ class LinUCBAgent(Agent):
                     / (self.arm_dim * self.lmbd)
                 ))))
 
-# TODO implement contextual linear bandit
+
+class ContextualLinUCBAgent(LinUCBAgent):
+    def __init__(self, arms, contexts, psi, horizon, lmbd,
+                 max_theta_norm, max_arm_norm, random_state=1):
+        super().__init__(arms, horizon, lmbd,
+                         max_theta_norm, max_arm_norm, random_state)
+        self.contexts = contexts
+        if psi is None:
+            self.psi = lambda a, x: np.multiply(a, x)
+        else:
+            self.psi = psi
+        self.reset()
+
+    def pull_arm(self, context_i, arm_i=None):
+        self.last_context = self.contexts[context_i]
+        if arm_i is not None:
+            self.a_hist.append(arm_i)
+            self.last_pull_i = arm_i
+            return self.last_pull_i
+
+        if self.first:
+            self.last_pull_i = int(np.random.uniform(high=self.n_arms))
+            self.first = False
+        else:
+            _, self.last_pull_i = self._estimate_linucb_arm()
+        self.a_hist.append(self.last_pull_i)
+        return self.last_pull_i
+
+    def update(self, reward):
+        # TODO consider if reshape is avoidable by saving arms in right format
+        last_psi = self.psi(self.arms[self.last_pull_i], self.last_context)
+        last_psi = last_psi.reshape(self.arm_dim, 1)
+        self.V_t = self.V_t + (last_psi @ last_psi.T)
+        self.b_vect = self.b_vect + last_psi * reward
+        self.theta_hat = np.linalg.inv(self.V_t) @ self.b_vect
+        self.t += 1
+
+    def _estimate_linucb_arm(self):
+        bound = self._beta_t_fun_linucb()
+        for i, arm in enumerate(self.arms):
+            # arm = arm.reshape(self.arm_dim, 1)
+            psi = self.psi(arm, self.last_context)
+            psi = psi.reshape(self.arm_dim, 1)
+            self.last_ucb[i] = (self.theta_hat.T @ psi + bound
+                                * np.sqrt(psi.T @ np.linalg.inv(self.V_t) @ psi))
+        return self.arms[np.argmax(self.last_ucb), :], np.argmax(self.last_ucb)
+
+    def _beta_t_fun_linucb(self):
+        return (self.max_theta_norm * np.sqrt(self.lmbd)
+                + np.sqrt(2 * np.log(self.horizon)
+                + (self.arm_dim * np.log(
+                    (self.arm_dim * self.lmbd
+                     + self.horizon * (self.max_arm_norm ** 2))
+                    / (self.arm_dim * self.lmbd)
+                ))))
+
 
 class ProductLinUCBAgent(Agent):
     """Combines a global linear bandit and an independent instance per context"""
@@ -169,14 +226,14 @@ class ProductLinUCBAgent(Agent):
         self.contexts = contexts
         self.reset()
 
-    def pull_arm(self, context_i):
+    def pull_arm(self, context_i, arm_i=None):
         """arm = argmax (theta * arm + theta_p * arm)"""
         self.last_context_i = context_i
         ucb = self.agent_global.last_ucb + \
             self.context_agent[context_i].last_ucb
         self.last_pull_i = np.argmax(ucb)
-        self.agent_global.pull_arm(self.last_pull_i)
-        self.context_agent[context_i].pull_arm(self.last_pull_i)
+        self.agent_global.pull_arm(arm_i=self.last_pull_i)
+        self.context_agent[context_i].pull_arm(arm_i=self.last_pull_i)
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 

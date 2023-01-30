@@ -3,6 +3,7 @@ from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor
 
 from src.environment import ContextualLinearEnvironment
+from src.agents import ContextualLinUCBAgent, ProductLinUCBAgent
 
 
 class Core:
@@ -35,7 +36,7 @@ class Core:
         for _ in range(n_rounds):
             if isinstance(environment, ContextualLinearEnvironment):
                 x_i = environment.get_context()
-                new_a = agent.pull_arm(x_i)
+                new_a = agent.pull_arm(context_i=x_i)
             else:
                 new_a = agent.pull_arm()
             environment.round(new_a)

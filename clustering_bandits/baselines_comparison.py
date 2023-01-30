@@ -2,8 +2,8 @@ import os
 os.environ['PYTHONWARNINGS'] = 'ignore::RuntimeWarning'
 
 if __name__ == '__main__':
-    from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ProductLinUCBAgent
-    from src.environment import LinearEnvironment, ProductEnvironment
+    from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ContextualLinUCBAgent, ProductLinUCBAgent
+    from src.environment import LinearEnvironment, ContextualLinearEnvironment, ProductEnvironment
     from src.core import Core
     import matplotlib.pyplot as plt
     import numpy as np
@@ -24,24 +24,39 @@ if __name__ == '__main__':
 
         f = open(f'clustering_bandits/test/input/testcase_{testcase_id}.json')
         param_dict = json.load(f)
-        print(f'Parameters: {param_dict}')
+        print(f'Running testcase_{testcase_id}')
 
         # list to np.array
         for k, v in param_dict.items():
             if type(v) == list:
-                param_dict[k] = np.asarray(v)
+                param_dict[k] = np.squeeze(np.asarray(v))
 
         logs = {}
         a_hists = {}
 
+        # env = LinearEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], theta=param_dict["theta"],
+        #                         noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
+        # env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
+        #                                   contexts=param_dict["contexts"],
+        #                                   arms=param_dict["arms"],
+        #                                   theta=param_dict["theta"],
+        #                                   noise_std=param_dict['noise_std'],
+        #                                   random_state=param_dict['seed'])
+        env = ProductEnvironment(n_rounds=param_dict["horizon"],
+                                 contexts=param_dict["contexts"],
+                                 arms=param_dict["arms"],
+                                 theta=param_dict["theta"],
+                                 theta_p=param_dict["theta_p"],
+                                 noise_std=param_dict['noise_std'],
+                                 random_state=param_dict['seed'])
+
         # Clairvoyant
         print('Training Clairvoyant Algorithm')
-        clrv = 'Clairvoyant'
-        # env = LinearEnvironment(n_rounds=param_dict["horizon"], theta=param_dict["theta"],
-        #                         noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        env = ProductEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], contexts=param_dict["contexts"],
-                                 theta=param_dict["theta"], theta_p=param_dict["theta_p"], noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        agent = Clairvoyant(contexts=param_dict["contexts"], arms=param_dict["arms"], theta=param_dict["theta"], theta_p=param_dict["theta_p"])
+        agent = Clairvoyant(arms=param_dict["arms"], theta=param_dict["theta"],
+                            theta_p=param_dict["theta_p"],
+                            contexts=param_dict["contexts"]
+                            )
+        env.reset()
         core = Core(env, agent)
         # rewards, arms
         clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
@@ -53,10 +68,9 @@ if __name__ == '__main__':
 
         # UCB1
         print('Training UCB1 Algorithm')
-        env = LinearEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], theta=param_dict["theta"],
-                                noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
         agent = UCB1Agent(
             param_dict["arms"], max_reward=max_reward, random_state=param_dict['seed'])
+        env.reset()
         core = Core(env, agent)
         logs['UCB1'], a_hists['UCB1'] = core.simulation(
             n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
@@ -64,15 +78,25 @@ if __name__ == '__main__':
 
         # LinUCB
         print('Training LinUCB Algorithm')
-        env = LinearEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], theta=param_dict["theta"],
-                                noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
         agent = LinUCBAgent(param_dict["arms"], param_dict["horizon"], lmbd=1,
                             max_theta_norm=param_dict["max_theta_norm"],
                             max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
+        env.reset()
         core = Core(env, agent)
         logs['LinUCB'], a_hists['LinUCB'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         logs['LinUCB'] = logs['LinUCB'][:, 1:]
+
+        # ContextualLinUCB
+        print('Training ContextualLinUCB Algorithm')
+        agent = ContextualLinUCBAgent(param_dict["arms"], param_dict["contexts"], None, param_dict["horizon"], lmbd=1,
+                                      max_theta_norm=param_dict["max_theta_norm"],
+                                      max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
+        env.reset()
+        core = Core(env, agent)
+        logs['ContextualLinUCBAgent'], a_hists['ContextualLinUCBAgent'] = core.simulation(
+            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
+        logs['ContextualLinUCBAgent'] = logs['ContextualLinUCBAgent'][:, 1:]
 
         # ProductLinUCB
         print('Training ProductLinUCB Algorithm')
@@ -103,7 +127,7 @@ if __name__ == '__main__':
         sqrtn = np.sqrt(param_dict['n_epochs'])
 
         ax[0].plot(x, np.mean(clairvoyant_logs.T, axis=1)
-                   [x], label=clrv, color='C0')
+                   [x], label='Clairvoyant', color='C0')
         ax[0].fill_between(x, np.mean(clairvoyant_logs.T, axis=1)[x]-np.std(clairvoyant_logs.T, axis=1)[x]/sqrtn,
                            np.mean(clairvoyant_logs.T, axis=1)[x]+np.std(clairvoyant_logs.T, axis=1)[x]/sqrtn, alpha=0.3, color='C0')
         for i, label in enumerate(regret.keys()):
