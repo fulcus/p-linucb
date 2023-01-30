@@ -37,8 +37,8 @@ if __name__ == '__main__':
     }
 
     if args.type in ['c', 'p']:
-        contexts = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
-        params["contexts"] = contexts.tolist(),
+        context_set = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
+        params["context_set"] = context_set.tolist(),
     if args.type == 'p':
         theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
         params["theta_p"] = theta_p.tolist(),

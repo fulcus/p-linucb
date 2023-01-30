@@ -31,9 +31,9 @@ class Agent(ABC):
 class Clairvoyant(Agent):
     """Agent that always pulls the optimal arm"""
 
-    def __init__(self, arms, theta, theta_p=None, contexts=None, psi=None, random_state=1):
+    def __init__(self, arms, theta, theta_p=None, context_set=None, psi=None, random_state=1):
         super().__init__(arms, random_state)
-        self.contexts = contexts
+        self.context_set = context_set
         self.theta = theta
         self.theta_p = theta_p
         if psi is None:
@@ -52,11 +52,11 @@ class Clairvoyant(Agent):
             for i, arm in enumerate(self.arms):
                 exp_rewards[i] = self.theta @ arm
         else:
-            context = self.contexts[context_i]
+            context = self.context_set[context_i]
             for i, arm in enumerate(self.arms):
                 psi = self.psi(arm, context)
                 if self.theta_p is None:
-                    exp_rewards[i] = (self.theta @ psi)
+                    exp_rewards[i] = self.theta @ psi
                 else:
                     exp_rewards[i] = (self.theta @ psi
                                       + self.theta_p[context_i] @ psi)
@@ -157,11 +157,11 @@ class LinUCBAgent(Agent):
 
 
 class ContextualLinUCBAgent(LinUCBAgent):
-    def __init__(self, arms, contexts, psi, horizon, lmbd,
+    def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm, max_arm_norm, random_state=1):
         super().__init__(arms, horizon, lmbd,
                          max_theta_norm, max_arm_norm, random_state)
-        self.contexts = contexts
+        self.context_set = context_set
         if psi is None:
             self.psi = lambda a, x: np.multiply(a, x)
         else:
@@ -169,7 +169,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
         self.reset()
 
     def pull_arm(self, context_i, arm_i=None):
-        self.last_context = self.contexts[context_i]
+        self.last_context = self.context_set[context_i]
         if arm_i is not None:
             self.a_hist.append(arm_i)
             self.last_pull_i = arm_i
@@ -184,7 +184,6 @@ class ContextualLinUCBAgent(LinUCBAgent):
         return self.last_pull_i
 
     def update(self, reward):
-        # TODO consider if reshape is avoidable by saving arms in right format
         last_psi = self.psi(self.arms[self.last_pull_i], self.last_context)
         last_psi = last_psi.reshape(self.arm_dim, 1)
         self.V_t = self.V_t + (last_psi @ last_psi.T)
@@ -195,7 +194,6 @@ class ContextualLinUCBAgent(LinUCBAgent):
     def _estimate_linucb_arm(self):
         bound = self._beta_t_fun_linucb()
         for i, arm in enumerate(self.arms):
-            # arm = arm.reshape(self.arm_dim, 1)
             psi = self.psi(arm, self.last_context)
             psi = psi.reshape(self.arm_dim, 1)
             self.last_ucb[i] = (self.theta_hat.T @ psi + bound
@@ -215,7 +213,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
 class ProductLinUCBAgent(Agent):
     """Combines a global linear bandit and an independent instance per context"""
 
-    def __init__(self, contexts, arms, horizon, lmbd,
+    def __init__(self, context_set, arms, horizon, lmbd,
                  max_theta_norm, max_arm_norm, random_state=1):
         super().__init__(arms, random_state)
         self.random_state = random_state
@@ -223,7 +221,7 @@ class ProductLinUCBAgent(Agent):
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
-        self.contexts = contexts
+        self.context_set = context_set
         self.reset()
 
     def pull_arm(self, context_i, arm_i=None):
@@ -253,5 +251,5 @@ class ProductLinUCBAgent(Agent):
                 self.arms, self.horizon,
                 self.lmbd, self.max_theta_norm,
                 self.max_arm_norm, self.random_state)
-            for _ in self.contexts
+            for _ in self.context_set
         ]
