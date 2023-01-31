@@ -66,15 +66,14 @@ class ContextualLinearEnvironment(LinearEnvironment):
         self.context_indexes = np.random.randint(
             0, self.context_set.shape[0], self.n_rounds)
         self.noise = np.random.normal(0, self.noise_std, self.n_rounds)
-        # self.contexts = np.array([self.context_set[i] for i in indexes])
         return self
 
 
 class ProductEnvironment(ContextualLinearEnvironment):
     """exp_reward = theta * psi(arm, context) + theta_p[context] * psi(arm, context)"""
 
-    def __init__(self, n_rounds, arms, contexts, theta, theta_p, psi=None, noise_std=0.01, random_state=1):
-        super().__init__(n_rounds, arms, contexts, theta, psi, noise_std, random_state)
+    def __init__(self, n_rounds, arms, context_set, theta, theta_p, psi=None, noise_std=0.01, random_state=1):
+        super().__init__(n_rounds, arms, context_set, theta, psi, noise_std, random_state)
         self.theta_p = theta_p
         self.reset()
 

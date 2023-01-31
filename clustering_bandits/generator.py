@@ -8,11 +8,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='generator',
         description='generates test cases')
-    parser.add_argument('-s', '--seed', type=int)
-    parser.add_argument('-t', '--type', choices=['l', 'c', 'p'], default='p')
+    parser.add_argument('-s', '--seed', type=int, default=np.random.randint(0, 1000))
+    parser.add_argument('-e', '--env', choices=['l', 'c', 'p'], default='p')
     args = parser.parse_args()
-    if args.seed is None:
-        args.seed = np.random.randint(0, 1000)
     np.random.seed(args.seed)
 
     n_arms = 5
@@ -36,15 +34,15 @@ if __name__ == '__main__':
         "noise_std": 0.01,
     }
 
-    if args.type in ['c', 'p']:
+    if args.env in ['c', 'p']:
         context_set = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
         params["context_set"] = context_set.tolist(),
-    if args.type == 'p':
+    if args.env == 'p':
         theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
         params["theta_p"] = theta_p.tolist(),
 
-    print(f"Generated testcase_{args.seed} of type {args.type}")
+    print(f"Generated testcase_{args.seed} of env {args.env}")
     out_folder = 'clustering_bandits/test/input/'
     os.makedirs(out_folder, exist_ok=True)
-    with open(out_folder + f"testcase_{args.seed}.json", "w") as f:
+    with open(out_folder + f"testcase_{args.env}_{args.seed}.json", "w") as f:
         json.dump(params, f, indent=4)

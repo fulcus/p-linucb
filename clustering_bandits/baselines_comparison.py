@@ -1,68 +1,75 @@
+from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ContextualLinUCBAgent, INDLinUCBAgent, ProductLinUCBAgent
+from src.environment import LinearEnvironment, ContextualLinearEnvironment, ProductEnvironment
+from src.core import Core
+
+import matplotlib.pyplot as plt
+import numpy as np
+import tikzplotlib as tikz
+import argparse
+import warnings
+import json
 import os
-os.environ['PYTHONWARNINGS'] = 'ignore::RuntimeWarning'
+
 
 if __name__ == '__main__':
-    from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ContextualLinUCBAgent, INDLinUCBAgent, ProductLinUCBAgent
-    from src.environment import LinearEnvironment, ContextualLinearEnvironment, ProductEnvironment
-    from src.core import Core
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import tikzplotlib as tikz
-    import warnings
-    import json
-    import sys
-
     warnings.filterwarnings('ignore')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--sim_id', type=int, default=0)
+    parser.add_argument('-e', '--env', choices=['l', 'c', 'p'], default='p')
+    args = parser.parse_args()
+
+    in_dir = 'clustering_bandits/test/input/'
+    out_dir = f'clustering_bandits/test/output/simulation_{args.sim_id}/'
+    # os.makedirs(out_dir + 'tex/', exist_ok=True)
+    os.makedirs(out_dir + 'png/', exist_ok=True)
     final_logs = {}
-    simulation_id = sys.argv[1]
-    out_folder = f'clustering_bandits/test/output/simulation_{simulation_id}/'
-    os.makedirs(out_folder + 'tex/', exist_ok=True)
-    os.makedirs(out_folder + 'png/', exist_ok=True)
 
-    for testcase_id in sys.argv[2:]:
-        print(f'################## Testcase {testcase_id} ###################')
+    for testcase in os.listdir(in_dir):
+        print(f'################## Testcase {testcase} ###################')
 
-        f = open(f'clustering_bandits/test/input/testcase_{testcase_id}.json')
-        param_dict = json.load(f)
-        print(f'Running testcase_{testcase_id}')
+        with open(f'{in_dir}{testcase}') as f:
+            param_dict = json.load(f)
+        testcase, _ = testcase.split('.')
 
-        # list to np.array
+        # list to np.ndarray
         for k, v in param_dict.items():
             if type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
 
         logs = {}
         a_hists = {}
+        if "theta_p" in param_dict:
+            print("Product Setting")
+            theta_p = param_dict["context_set"]
+        else:
+            theta_p = None
+            print("Contextual Setting")
 
-        # env = LinearEnvironment(n_rounds=param_dict["horizon"], arms=param_dict["arms"], theta=param_dict["theta"],
-        #                         noise_std=param_dict['noise_std'], random_state=param_dict['seed'])
-        env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["context_set"],
-                                          arms=param_dict["arms"],
-                                          theta=param_dict["theta"],
-                                          noise_std=param_dict['noise_std'],
-                                          random_state=param_dict['seed'])
-        # env = ProductEnvironment(n_rounds=param_dict["horizon"],
-        #                          arms=param_dict["arms"],
-        #                          context_set=param_dict["context_set"],
-        #                          theta=param_dict["theta"],
-        #                          theta_p=param_dict["theta_p"],
-        #                          noise_std=param_dict['noise_std'],
-        #                          random_state=param_dict['seed'])
+        if args.env == 'c':
+            env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
+                                              context_set=param_dict["context_set"],
+                                              arms=param_dict["arms"],
+                                              theta=param_dict["theta"],
+                                              noise_std=param_dict['noise_std'],
+                                              random_state=param_dict['seed'])
+        elif args.env == 'p':
+            env = ProductEnvironment(n_rounds=param_dict["horizon"],
+                                     arms=param_dict["arms"],
+                                     context_set=param_dict["context_set"],
+                                     theta=param_dict["theta"],
+                                     theta_p=theta_p,
+                                     noise_std=param_dict['noise_std'],
+                                     random_state=param_dict['seed'])
 
         # Clairvoyant
         print('Training Clairvoyant Algorithm')
         agent = Clairvoyant(arms=param_dict["arms"],
                             theta=param_dict["theta"],
-                            # theta_p=param_dict["theta_p"],
+                            theta_p=theta_p,
                             context_set=param_dict["context_set"]
                             )
-        env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["context_set"],
-                                          arms=param_dict["arms"],
-                                          theta=param_dict["theta"],
-                                          noise_std=param_dict['noise_std'],
-                                          random_state=param_dict['seed'])
+        env.reset()
         core = Core(env, agent)
         # rewards, arms
         clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
@@ -76,12 +83,7 @@ if __name__ == '__main__':
         print('Training UCB1 Algorithm')
         agent = UCB1Agent(
             param_dict["arms"], max_reward=max_reward, random_state=param_dict['seed'])
-        env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["context_set"],
-                                          arms=param_dict["arms"],
-                                          theta=param_dict["theta"],
-                                          noise_std=param_dict['noise_std'],
-                                          random_state=param_dict['seed'])
+        env.reset()
         core = Core(env, agent)
         logs['UCB1'], a_hists['UCB1'] = core.simulation(
             n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
@@ -92,12 +94,7 @@ if __name__ == '__main__':
         agent = LinUCBAgent(param_dict["arms"], param_dict["horizon"], lmbd=1,
                             max_theta_norm=param_dict["max_theta_norm"],
                             max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
-        env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["context_set"],
-                                          arms=param_dict["arms"],
-                                          theta=param_dict["theta"],
-                                          noise_std=param_dict['noise_std'],
-                                          random_state=param_dict['seed'])
+        env.reset()
         core = Core(env, agent)
         logs['LinUCB'], a_hists['LinUCB'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
@@ -108,12 +105,7 @@ if __name__ == '__main__':
         agent = ContextualLinUCBAgent(param_dict["arms"], param_dict["context_set"], None, param_dict["horizon"], lmbd=1,
                                       max_theta_norm=param_dict["max_theta_norm"],
                                       max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
-        env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["context_set"],
-                                          arms=param_dict["arms"],
-                                          theta=param_dict["theta"],
-                                          noise_std=param_dict['noise_std'],
-                                          random_state=param_dict['seed'])
+        env.reset()
         core = Core(env, agent)
         logs['ContextualLinUCBAgent'], a_hists['ContextualLinUCBAgent'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
@@ -124,12 +116,7 @@ if __name__ == '__main__':
         agent = INDLinUCBAgent(param_dict["arms"], param_dict["context_set"], None, param_dict["horizon"], lmbd=1,
                                max_theta_norm=param_dict["max_theta_norm"],
                                max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
-        env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                          context_set=param_dict["context_set"],
-                                          arms=param_dict["arms"],
-                                          theta=param_dict["theta"],
-                                          noise_std=param_dict['noise_std'],
-                                          random_state=param_dict['seed'])
+        env.reset()
         core = Core(env, agent)
         logs['INDLinUCBAgent'], a_hists['INDLinUCBAgent'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
@@ -191,8 +178,8 @@ if __name__ == '__main__':
         ax[2].set_title('Cumulative Regret')
         ax[2].legend()
 
-        # tikz.save(out_folder + f"tex/testcase_{testcase_id}_all.tex")
-        plt.savefig(out_folder + f"png/testcase_{testcase_id}_all.png")
+        # tikz.save(out_folder + f"tex/{testcase_id}_all.tex")
+        plt.savefig(out_dir + f"png/{testcase}_all.png")
 
         #  cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+50, step=50)
@@ -211,11 +198,11 @@ if __name__ == '__main__':
         ax.set_title('Cumulative Regret')
         ax.legend()
 
-        # tikz.save(out_folder + f"tex/testcase_{testcase_id}_regret.tex")
-        plt.savefig(out_folder + f"png/testcase_{testcase_id}_regret.png")
+        # tikz.save(out_folder + f"tex/{testcase_id}_regret.tex")
+        plt.savefig(out_dir + f"png/{testcase}_regret.png")
 
         # logging
-        final_logs[f'testcase_{testcase_id}'] = {label: np.mean(
+        final_logs[f'{testcase}'] = {label: np.mean(
             np.sum(regret[label].T, axis=0)) for label in regret.keys()}
 
         # arm history plots
@@ -229,8 +216,8 @@ if __name__ == '__main__':
             ax_.set_xlim(-1, n_arms)
             ax_.set_title(label)
 
-        tikz.save(out_folder + f"tex/testcase_{testcase_id}_a_hist.tex")
-        plt.savefig(out_folder + f"png/testcase_{testcase_id}_a_hist.png")
+        # tikz.save(out_dir + f"tex/{testcase}_a_hist.tex")
+        plt.savefig(out_dir + f"png/{testcase}_a_hist.png")
 
         f, ax = plt.subplots(3, 2, figsize=(20, 30))
         for ax_, label in zip(f.axes, a_hists.keys()):
@@ -238,9 +225,9 @@ if __name__ == '__main__':
             ax_.plot(a_hists[label][-1, :])
             ax_.set_title(label)
 
-        # tikz.save(out_folder + f"tex/testcase_{testcase_id}_a_hist_temp.tex")
-        plt.savefig(out_folder + f"png/testcase_{testcase_id}_a_hist_temp.png")
+        # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
+        plt.savefig(out_dir + f"png/{testcase}_a_hist_temp.png")
 
-    out_file = open(out_folder + f"logs.json", "w")
+    out_file = open(out_dir + f"logs.json", "w")
     json.dump(final_logs, out_file, indent=4)
     out_file.close()
