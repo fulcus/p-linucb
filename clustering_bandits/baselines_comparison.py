@@ -41,7 +41,7 @@ if __name__ == '__main__':
         a_hists = {}
         if "theta_p" in param_dict:
             print("Product Setting")
-            theta_p = param_dict["context_set"]
+            theta_p = param_dict["theta_p"]
         else:
             theta_p = None
             print("Contextual Setting")
@@ -67,14 +67,12 @@ if __name__ == '__main__':
         agent = Clairvoyant(arms=param_dict["arms"],
                             theta=param_dict["theta"],
                             theta_p=theta_p,
-                            context_set=param_dict["context_set"]
-                            )
+                            context_set=param_dict["context_set"])
         env.reset()
         core = Core(env, agent)
         # rewards, arms
         clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-        clairvoyant_logs = clairvoyant_logs[:, 1:]
 
         # Reward upper bound
         max_reward = clairvoyant_logs.max()
@@ -87,7 +85,6 @@ if __name__ == '__main__':
         core = Core(env, agent)
         logs['UCB1'], a_hists['UCB1'] = core.simulation(
             n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
-        logs['UCB1'] = logs['UCB1'][:, 1:]
 
         # LinUCB
         print('Training LinUCB Algorithm')
@@ -100,7 +97,6 @@ if __name__ == '__main__':
         core = Core(env, agent)
         logs['LinUCB'], a_hists['LinUCB'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-        logs['LinUCB'] = logs['LinUCB'][:, 1:]
 
         # ContextualLinUCB
         print('Training ContextualLinUCB Algorithm')
@@ -111,9 +107,8 @@ if __name__ == '__main__':
                                       random_state=param_dict['seed'])
         env.reset()
         core = Core(env, agent)
-        logs['ContextualLinUCBAgent'], a_hists['ContextualLinUCBAgent'] = core.simulation(
+        logs['ContextualLinUCB'], a_hists['ContextualLinUCB'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-        logs['ContextualLinUCBAgent'] = logs['ContextualLinUCBAgent'][:, 1:]
 
         # INDLinUCB
         print('Training INDLinUCBAgent Algorithm')
@@ -130,16 +125,22 @@ if __name__ == '__main__':
         core = Core(env, agent)
         logs['INDLinUCBAgent'], a_hists['INDLinUCBAgent'] = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-        logs['INDLinUCBAgent'] = logs['INDLinUCBAgent'][:, 1:]
 
         # ProductLinUCB
-        # print('Training ProductLinUCB Algorithm')
-        # agent = ProductLinUCBAgent ...
-        # env.reset()
-        # core = Core(env, agent)
-        # logs['ProductLinUCB'], a_hists['ProductLinUCB'] = core.simulation(
-        #     n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-        # logs['ProductLinUCB'] = logs['ProductLinUCB'][:, 1:]
+        print('Training ProductLinUCB Algorithm')
+        agent = ProductLinUCBAgent(param_dict["arms"],
+                               param_dict["context_set"],
+                               None,
+                               param_dict["horizon"],
+                               lmbd=1,
+                               max_theta_norm=param_dict["max_theta_norm"],
+                               max_arm_norm=param_dict["max_arm_norm"],
+                               sigma=param_dict['sigma'],
+                               random_state=param_dict['seed'])
+        env.reset()
+        core = Core(env, agent)
+        logs['ProductLinUCB'], a_hists['ProductLinUCB'] = core.simulation(
+            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
 
         # Regrets computing
         print('Computing regrets...')
@@ -147,9 +148,9 @@ if __name__ == '__main__':
 
         regret = {label: np.inf *
                   np.ones((param_dict['n_epochs'], param_dict["horizon"])) for label in logs.keys()}
-        for i in range(param_dict['n_epochs']):
-            for label in regret.keys():
-                logs[label] = logs[label].astype(np.float64)
+        for label in regret.keys():
+            logs[label] = logs[label].astype(np.float64)
+            for i in range(param_dict['n_epochs']):
                 regret[label][i, :] = clairvoyant_logs[i, :] - \
                     logs[label][i, :]
 
