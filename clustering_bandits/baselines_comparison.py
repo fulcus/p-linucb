@@ -1,5 +1,5 @@
 from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ContextualLinUCBAgent, INDLinUCBAgent, ProductLinUCBAgent
-from src.environment import LinearEnvironment, ContextualLinearEnvironment, ProductEnvironment
+from src.environment import ContextualLinearEnvironment, ProductEnvironment
 from src.core import Core
 
 import matplotlib.pyplot as plt
@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--sim_id', type=int, default=0)
-    parser.add_argument('-e', '--env', choices=['l', 'c', 'p'], default='p')
+    parser.add_argument('-e', '--env', choices=['c', 'p'], default='p')
     args = parser.parse_args()
 
     in_dir = 'clustering_bandits/test/input/'

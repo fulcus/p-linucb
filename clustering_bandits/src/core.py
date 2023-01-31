@@ -34,11 +34,8 @@ class Core:
 
     def epoch(self, agent, environment, n_rounds=10):
         for _ in range(n_rounds):
-            if isinstance(environment, ContextualLinearEnvironment):
-                x_i = environment.get_context()
-                new_a = agent.pull_arm(context_i=x_i)
-            else:
-                new_a = agent.pull_arm()
+            x_i = environment.get_context()
+            new_a = agent.pull_arm(context_i=x_i)
             environment.round(new_a)
             agent.update(
                 environment.rewards[-1])

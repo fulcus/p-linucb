@@ -38,20 +38,16 @@ class Clairvoyant(Agent):
             self.psi = psi
         super().__init__(arms, random_state)
 
-    def pull_arm(self, context_i=None):
+    def pull_arm(self, context_i):
         exp_rewards = np.zeros(self.n_arms)
-        if context_i is None:
-            for i, arm in enumerate(self.arms):
-                exp_rewards[i] = self.theta @ arm
-        else:
-            context = self.context_set[context_i]
-            for i, arm in enumerate(self.arms):
-                psi = self.psi(arm, context)
-                if self.theta_p is None:
-                    exp_rewards[i] = self.theta @ psi
-                else:
-                    exp_rewards[i] = (self.theta @ psi
-                                      + self.theta_p[context_i] @ psi)
+        context = self.context_set[context_i]
+        for i, arm in enumerate(self.arms):
+            psi = self.psi(arm, context)
+            if self.theta_p is None:
+                exp_rewards[i] = self.theta @ psi
+            else:
+                exp_rewards[i] = (self.theta @ psi
+                                  + self.theta_p[context_i] @ psi)
         self.last_pull_i = np.argmax(exp_rewards)
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
@@ -147,8 +143,6 @@ class LinUCBAgent(Agent):
                     / (self.arm_dim * self.lmbd)
                 ))))
 
-# TODO phi cart prod
-
 
 class ContextualLinUCBAgent(LinUCBAgent):
     def __init__(self, arms, context_set, psi, horizon, lmbd,
@@ -208,16 +202,6 @@ class INDLinUCBAgent(Agent):
         self.sigma = sigma
         super().__init__(arms, random_state)
 
-    def pull_arm(self, context_i):
-        """arm = argmax (theta * arm + theta_p * arm)"""
-        self.last_context_i = context_i
-        arm_i = self.context_agent[context_i].pull_arm()
-        self.a_hist.append(arm_i)
-        return arm_i
-
-    def update(self, reward):
-        self.context_agent[self.last_context_i].update(reward)
-
     def reset(self):
         super().reset()
         self.context_agent = [
@@ -232,12 +216,21 @@ class INDLinUCBAgent(Agent):
             for _ in self.context_set
         ]
 
-# TODO with phi, context dim 4, action 1
+    def pull_arm(self, context_i):
+        """arm = argmax (theta * arm + theta_p * arm)"""
+        self.last_context_i = context_i
+        arm_i = self.context_agent[context_i].pull_arm()
+        self.a_hist.append(arm_i)
+        return arm_i
+
+    def update(self, reward):
+        self.context_agent[self.last_context_i].update(reward)
 
 
 class ProductLinUCBAgent(Agent):
     """Combines a global linear bandit and an independent instance per context"""
     # TODO swap global linucb with contextual
+    # with phi (cart prod), context dim 4, action 1
 
     def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma, random_state=1):
