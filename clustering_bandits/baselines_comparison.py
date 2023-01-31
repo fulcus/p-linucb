@@ -51,7 +51,7 @@ if __name__ == '__main__':
                                               context_set=param_dict["context_set"],
                                               arms=param_dict["arms"],
                                               theta=param_dict["theta"],
-                                              noise_std=param_dict['noise_std'],
+                                              sigma=param_dict['sigma'],
                                               random_state=param_dict['seed'])
         elif args.env == 'p':
             env = ProductEnvironment(n_rounds=param_dict["horizon"],
@@ -59,7 +59,7 @@ if __name__ == '__main__':
                                      context_set=param_dict["context_set"],
                                      theta=param_dict["theta"],
                                      theta_p=theta_p,
-                                     noise_std=param_dict['noise_std'],
+                                     sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
 
         # Clairvoyant
@@ -93,7 +93,9 @@ if __name__ == '__main__':
         print('Training LinUCB Algorithm')
         agent = LinUCBAgent(param_dict["arms"], param_dict["horizon"], lmbd=1,
                             max_theta_norm=param_dict["max_theta_norm"],
-                            max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
+                            max_arm_norm=param_dict["max_arm_norm"],
+                            sigma=param_dict['sigma'],
+                            random_state=param_dict['seed'])
         env.reset()
         core = Core(env, agent)
         logs['LinUCB'], a_hists['LinUCB'] = core.simulation(
@@ -104,7 +106,9 @@ if __name__ == '__main__':
         print('Training ContextualLinUCB Algorithm')
         agent = ContextualLinUCBAgent(param_dict["arms"], param_dict["context_set"], None, param_dict["horizon"], lmbd=1,
                                       max_theta_norm=param_dict["max_theta_norm"],
-                                      max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
+                                      max_arm_norm=param_dict["max_arm_norm"],
+                                      sigma=param_dict['sigma'],
+                                      random_state=param_dict['seed'])
         env.reset()
         core = Core(env, agent)
         logs['ContextualLinUCBAgent'], a_hists['ContextualLinUCBAgent'] = core.simulation(
@@ -113,9 +117,15 @@ if __name__ == '__main__':
 
         # INDLinUCB
         print('Training INDLinUCBAgent Algorithm')
-        agent = INDLinUCBAgent(param_dict["arms"], param_dict["context_set"], None, param_dict["horizon"], lmbd=1,
+        agent = INDLinUCBAgent(param_dict["arms"],
+                               param_dict["context_set"],
+                               None,
+                               param_dict["horizon"],
+                               lmbd=1,
                                max_theta_norm=param_dict["max_theta_norm"],
-                               max_arm_norm=param_dict["max_arm_norm"], random_state=param_dict['seed'])
+                               max_arm_norm=param_dict["max_arm_norm"],
+                               sigma=param_dict['sigma'],
+                               random_state=param_dict['seed'])
         env.reset()
         core = Core(env, agent)
         logs['INDLinUCBAgent'], a_hists['INDLinUCBAgent'] = core.simulation(

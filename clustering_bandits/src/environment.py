@@ -4,11 +4,11 @@ import numpy as np
 class LinearEnvironment:
     """exp_reward = theta * arm"""
 
-    def __init__(self, n_rounds, arms, theta, noise_std=0.01, random_state=1):
+    def __init__(self, n_rounds, arms, theta, sigma=0.01, random_state=1):
         self.n_rounds = n_rounds
         self.arms = arms
         self.theta = theta
-        self.noise_std = noise_std
+        self.sigma = sigma
         self.random_state = random_state
         self.t = None
         self.noise = None
@@ -24,30 +24,20 @@ class LinearEnvironment:
         self.t = 0
         self.rewards = None
         np.random.seed(self.random_state + i)
-        self.noise = np.random.normal(0, self.noise_std, self.n_rounds)
+        self.noise = np.random.normal(0, self.sigma, self.n_rounds)
         return self
 
 
 class ContextualLinearEnvironment(LinearEnvironment):
     """exp_reward = theta * psi(arm, context)"""
 
-    def __init__(self, n_rounds, context_set, arms, theta, psi=None, noise_std=0.01, random_state=1):
-        # super().__init__(n_rounds, arms, theta, noise_std, random_state)
-        self.n_rounds = n_rounds
-        self.arms = arms
-        self.theta = theta
-        self.noise_std = noise_std
-        self.random_state = random_state
-        self.t = None
-        self.noise = None
-        self.rewards = None
-
+    def __init__(self, n_rounds, context_set, arms, theta, psi=None, sigma=0.01, random_state=1):
         self.context_set = context_set
         if psi is None:
             self.psi = lambda a, x: np.multiply(a, x)
         else:
             self.psi = psi
-        self.reset()
+        super().__init__(n_rounds, arms, theta, sigma, random_state)
 
     def round(self, arm_i):
         obs_reward = (self.theta @ self.psi(self.arms[arm_i], self.context_set[self.last_context_i])
@@ -65,17 +55,17 @@ class ContextualLinearEnvironment(LinearEnvironment):
         np.random.seed(self.random_state + i)
         self.context_indexes = np.random.randint(
             0, self.context_set.shape[0], self.n_rounds)
-        self.noise = np.random.normal(0, self.noise_std, self.n_rounds)
+        np.random.seed(self.random_state + i)
+        self.noise = np.random.normal(0, self.sigma, self.n_rounds)
         return self
 
 
 class ProductEnvironment(ContextualLinearEnvironment):
     """exp_reward = theta * psi(arm, context) + theta_p[context] * psi(arm, context)"""
 
-    def __init__(self, n_rounds, arms, context_set, theta, theta_p, psi=None, noise_std=0.01, random_state=1):
-        super().__init__(n_rounds, arms, context_set, theta, psi, noise_std, random_state)
+    def __init__(self, n_rounds, arms, context_set, theta, theta_p, psi=None, sigma=0.01, random_state=1):
         self.theta_p = theta_p
-        self.reset()
+        super().__init__(n_rounds, arms, context_set, theta, psi, sigma, random_state)
 
     def round(self, arm_i):
         context = self.context_set[self.last_context_i]
