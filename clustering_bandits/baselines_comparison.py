@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('-s', '--sim_id', type=int, default=0)
-    parser.add_argument('-e', '--env', choices=['c', 'p'], default='p')
+    parser.add_argument('-t', '--test_file', default=None)
     args = parser.parse_args()
 
     in_dir = 'clustering_bandits/test/input/'
@@ -24,8 +24,10 @@ if __name__ == '__main__':
     # os.makedirs(out_dir + 'tex/', exist_ok=True)
     os.makedirs(out_dir + 'png/', exist_ok=True)
     final_logs = {}
+    test_files = os.listdir(
+        in_dir) if args.test_file is None else [args.test_file]
 
-    for testcase in os.listdir(in_dir):
+    for testcase in test_files:
         print(f'################## Testcase {testcase} ###################')
 
         with open(f'{in_dir}{testcase}') as f:
@@ -42,18 +44,6 @@ if __name__ == '__main__':
         if "theta_p" in param_dict:
             print("Product Setting")
             theta_p = param_dict["theta_p"]
-        else:
-            theta_p = None
-            print("Contextual Setting")
-
-        if args.env == 'c':
-            env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                              context_set=param_dict["context_set"],
-                                              arms=param_dict["arms"],
-                                              theta=param_dict["theta"],
-                                              sigma=param_dict['sigma'],
-                                              random_state=param_dict['seed'])
-        elif args.env == 'p':
             env = ProductEnvironment(n_rounds=param_dict["horizon"],
                                      arms=param_dict["arms"],
                                      context_set=param_dict["context_set"],
@@ -61,6 +51,15 @@ if __name__ == '__main__':
                                      theta_p=theta_p,
                                      sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
+        else:
+            print("Contextual Setting")
+            theta_p = None
+            env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
+                                              arms=param_dict["arms"],
+                                              theta=param_dict["theta"],
+                                              context_set=param_dict["context_set"],
+                                              sigma=param_dict['sigma'],
+                                              random_state=param_dict['seed'])
 
         # Clairvoyant
         print('Training Clairvoyant Algorithm')
@@ -129,14 +128,14 @@ if __name__ == '__main__':
         # ProductLinUCB
         print('Training ProductLinUCB Algorithm')
         agent = ProductLinUCBAgent(param_dict["arms"],
-                               param_dict["context_set"],
-                               None,
-                               param_dict["horizon"],
-                               lmbd=1,
-                               max_theta_norm=param_dict["max_theta_norm"],
-                               max_arm_norm=param_dict["max_arm_norm"],
-                               sigma=param_dict['sigma'],
-                               random_state=param_dict['seed'])
+                                   param_dict["context_set"],
+                                   None,
+                                   param_dict["horizon"],
+                                   lmbd=1,
+                                   max_theta_norm=param_dict["max_theta_norm"],
+                                   max_arm_norm=param_dict["max_arm_norm"],
+                                   sigma=param_dict['sigma'],
+                                   random_state=param_dict['seed'])
         env.reset()
         core = Core(env, agent)
         logs['ProductLinUCB'], a_hists['ProductLinUCB'] = core.simulation(
@@ -153,6 +152,21 @@ if __name__ == '__main__':
             for i in range(param_dict['n_epochs']):
                 regret[label][i, :] = clairvoyant_logs[i, :] - \
                     logs[label][i, :]
+
+        # print(np.where(regret["ContextualLinUCB"].squeeze() < 0))
+        # t = 24
+        # arm_i = a_hists['ContextualLinUCB'][0][t]
+        # last_context_i = env.context_indexes[t]
+        # context = env.context_set[env.context_indexes[t]]
+        # print(env.arms[arm_i].shape, context.shape)
+        # psi = env.psi(env.arms[arm_i], context)
+        # print(env.theta.shape, psi.shape)
+        # obs_reward = (env.theta @ psi
+        #               + env.theta_p[last_context_i] @ psi
+        #               + env.noise[t])
+        # obs_reward_true = (env.theta @ psi
+        #                    + env.theta_p[last_context_i] @ psi)
+        # print(obs_reward, obs_reward_true)
 
         # inst reward, inst regret and cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+1, step=250)

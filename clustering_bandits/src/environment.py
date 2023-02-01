@@ -31,7 +31,7 @@ class LinearEnvironment:
 class ContextualLinearEnvironment(LinearEnvironment):
     """exp_reward = theta * psi(arm, context)"""
 
-    def __init__(self, n_rounds, context_set, arms, theta, psi=None, sigma=0.01, random_state=1):
+    def __init__(self, n_rounds, arms, theta, context_set, psi=None, sigma=0.01, random_state=1):
         self.context_set = context_set
         if psi is None:
             self.psi = lambda a, x: np.multiply(a, x)
@@ -60,19 +60,14 @@ class ContextualLinearEnvironment(LinearEnvironment):
 class ProductEnvironment(ContextualLinearEnvironment):
     """exp_reward = theta * psi(arm, context) + theta_p[context] * psi(arm, context)"""
 
-    def __init__(self, n_rounds, arms, context_set, theta, theta_p, psi=None, sigma=0.01, random_state=1):
+    def __init__(self, n_rounds, arms, theta, context_set, theta_p, psi=None, sigma=0.01, random_state=1):
         self.theta_p = theta_p
-        super().__init__(n_rounds, arms, context_set, theta, psi, sigma, random_state)
+        super().__init__(n_rounds, arms, theta, context_set, psi, sigma, random_state)
 
     def round(self, arm_i):
-        context = self.context_set[self.last_context_i]
-        psi = self.psi(self.arms[arm_i], context)
+        psi = self.psi(self.arms[arm_i], self.context_set[self.last_context_i])
         obs_reward = (self.theta @ psi
                       + self.theta_p[self.last_context_i] @ psi
                       + self.noise[self.t])
         self.rewards = np.append(self.rewards, obs_reward)
         self.t += 1
-
-    def reset(self, i=0):
-        super().reset(i)
-        return self

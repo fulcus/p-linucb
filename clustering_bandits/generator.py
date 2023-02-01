@@ -43,9 +43,10 @@ if __name__ == '__main__':
         np.random.seed(args.seed)
         theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
         params["theta_p"] = theta_p.tolist(),
-
-    print(f"Generated testcase_{args.seed} of env {args.env}")
+    
+    filename = f"testcase_{args.env}_{args.seed}.json"
+    print(f"Generated filename")
     out_folder = 'clustering_bandits/test/input/'
     os.makedirs(out_folder, exist_ok=True)
-    with open(out_folder + f"testcase_{args.env}_{args.seed}.json", "w") as f:
+    with open(out_folder + "filename", "w") as f:
         json.dump(params, f, indent=4)
