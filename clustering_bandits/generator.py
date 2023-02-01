@@ -24,15 +24,15 @@ if __name__ == '__main__':
     max_arm_norm = np.max([np.linalg.norm(a) for a in arms])
     max_theta_norm = np.linalg.norm(theta)
     params = {
-        "seed": args.seed,
-        "arms": arms.tolist(),
-        "n_arms": arms.shape[1],
-        "theta": theta.tolist(),
-        "max_arm_norm": max_arm_norm,
-        "max_theta_norm": max_theta_norm,
         "horizon": 1000,
         "n_epochs": 10,
         "sigma": 0.01,
+        "seed": args.seed,
+        "max_arm_norm": max_arm_norm,
+        "max_theta_norm": max_theta_norm,
+        "n_arms": arms.shape[1],
+        "arms": arms.tolist(),
+        "theta": theta.tolist()
     }
 
     if args.env in ['c', 'p']:
@@ -45,8 +45,8 @@ if __name__ == '__main__':
         params["theta_p"] = theta_p.tolist(),
     
     filename = f"testcase_{args.env}_{args.seed}.json"
-    print(f"Generated filename")
+    print(f"Generated {filename}")
     out_folder = 'clustering_bandits/test/input/'
     os.makedirs(out_folder, exist_ok=True)
-    with open(out_folder + "filename", "w") as f:
+    with open(out_folder + filename, "w") as f:
         json.dump(params, f, indent=4)

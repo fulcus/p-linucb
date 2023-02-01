@@ -1,4 +1,4 @@
-from src.agents import UCB1Agent, Clairvoyant, LinUCBAgent, ContextualLinUCBAgent, INDLinUCBAgent, ProductLinUCBAgent
+from src.agents import *
 from src.environment import ContextualLinearEnvironment, ProductEnvironment
 from src.core import Core
 
@@ -33,11 +33,50 @@ if __name__ == '__main__':
         with open(f'{in_dir}{testcase}') as f:
             param_dict = json.load(f)
         testcase, _ = testcase.split('.')
-
         # list to np.ndarray
         for k, v in param_dict.items():
             if type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
+
+        agents_list = [
+            UCB1Agent(param_dict["arms"],
+                      max_reward,
+                      param_dict['seed']),
+            LinUCBAgent(param_dict["arms"],
+                        param_dict["horizon"],
+                        1,
+                        param_dict["max_theta_norm"],
+                        param_dict["max_arm_norm"],
+                        param_dict['sigma'],
+                        param_dict['seed']),
+            ContextualLinUCBAgent(param_dict["arms"],
+                                  param_dict["context_set"],
+                                  None,
+                                  param_dict["horizon"],
+                                  1,
+                                  param_dict["max_theta_norm"],
+                                  param_dict["max_arm_norm"],
+                                  param_dict['sigma'],
+                                  param_dict['seed']),
+            INDLinUCBAgent(param_dict["arms"],
+                           param_dict["context_set"],
+                           None,
+                           param_dict["horizon"],
+                           1,
+                           param_dict["max_theta_norm"],
+                           param_dict["max_arm_norm"],
+                           param_dict['sigma'],
+                           param_dict['seed']),
+            ProductLinUCBAgent(param_dict["arms"],
+                               param_dict["context_set"],
+                               None,
+                               param_dict["horizon"],
+                               1,
+                               param_dict["max_theta_norm"],
+                               param_dict["max_arm_norm"],
+                               param_dict['sigma'],
+                               param_dict['seed'])
+        ]
 
         logs = {}
         a_hists = {}
@@ -76,70 +115,13 @@ if __name__ == '__main__':
         # Reward upper bound
         max_reward = clairvoyant_logs.max()
 
-        # UCB1
-        print('Training UCB1 Algorithm')
-        agent = UCB1Agent(
-            param_dict["arms"], max_reward=max_reward, random_state=param_dict['seed'])
-        env.reset()
-        core = Core(env, agent)
-        logs['UCB1'], a_hists['UCB1'] = core.simulation(
-            n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
-
-        # LinUCB
-        print('Training LinUCB Algorithm')
-        agent = LinUCBAgent(param_dict["arms"], param_dict["horizon"], lmbd=1,
-                            max_theta_norm=param_dict["max_theta_norm"],
-                            max_arm_norm=param_dict["max_arm_norm"],
-                            sigma=param_dict['sigma'],
-                            random_state=param_dict['seed'])
-        env.reset()
-        core = Core(env, agent)
-        logs['LinUCB'], a_hists['LinUCB'] = core.simulation(
-            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-
-        # ContextualLinUCB
-        print('Training ContextualLinUCB Algorithm')
-        agent = ContextualLinUCBAgent(param_dict["arms"], param_dict["context_set"], None, param_dict["horizon"], lmbd=1,
-                                      max_theta_norm=param_dict["max_theta_norm"],
-                                      max_arm_norm=param_dict["max_arm_norm"],
-                                      sigma=param_dict['sigma'],
-                                      random_state=param_dict['seed'])
-        env.reset()
-        core = Core(env, agent)
-        logs['ContextualLinUCB'], a_hists['ContextualLinUCB'] = core.simulation(
-            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-
-        # INDLinUCB
-        print('Training INDLinUCBAgent Algorithm')
-        agent = INDLinUCBAgent(param_dict["arms"],
-                               param_dict["context_set"],
-                               None,
-                               param_dict["horizon"],
-                               lmbd=1,
-                               max_theta_norm=param_dict["max_theta_norm"],
-                               max_arm_norm=param_dict["max_arm_norm"],
-                               sigma=param_dict['sigma'],
-                               random_state=param_dict['seed'])
-        env.reset()
-        core = Core(env, agent)
-        logs['INDLinUCBAgent'], a_hists['INDLinUCBAgent'] = core.simulation(
-            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-
-        # ProductLinUCB
-        print('Training ProductLinUCB Algorithm')
-        agent = ProductLinUCBAgent(param_dict["arms"],
-                                   param_dict["context_set"],
-                                   None,
-                                   param_dict["horizon"],
-                                   lmbd=1,
-                                   max_theta_norm=param_dict["max_theta_norm"],
-                                   max_arm_norm=param_dict["max_arm_norm"],
-                                   sigma=param_dict['sigma'],
-                                   random_state=param_dict['seed'])
-        env.reset()
-        core = Core(env, agent)
-        logs['ProductLinUCB'], a_hists['ProductLinUCB'] = core.simulation(
-            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
+        # Train all agents
+        for agent in agents_list:
+            agent_name = agent.__class__.__name__
+            print(f"Training {agent_name}")
+            core = Core(env, agent)
+            logs[agent_name], a_hists[agent_name] = core.simulation(
+                n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
 
         # Regrets computing
         print('Computing regrets...')
@@ -152,21 +134,6 @@ if __name__ == '__main__':
             for i in range(param_dict['n_epochs']):
                 regret[label][i, :] = clairvoyant_logs[i, :] - \
                     logs[label][i, :]
-
-        # print(np.where(regret["ContextualLinUCB"].squeeze() < 0))
-        # t = 24
-        # arm_i = a_hists['ContextualLinUCB'][0][t]
-        # last_context_i = env.context_indexes[t]
-        # context = env.context_set[env.context_indexes[t]]
-        # print(env.arms[arm_i].shape, context.shape)
-        # psi = env.psi(env.arms[arm_i], context)
-        # print(env.theta.shape, psi.shape)
-        # obs_reward = (env.theta @ psi
-        #               + env.theta_p[last_context_i] @ psi
-        #               + env.noise[t])
-        # obs_reward_true = (env.theta @ psi
-        #                    + env.theta_p[last_context_i] @ psi)
-        # print(obs_reward, obs_reward_true)
 
         # inst reward, inst regret and cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+1, step=250)
@@ -209,7 +176,7 @@ if __name__ == '__main__':
         #  cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+50, step=50)
         x[-1] = min(x[-1],
-                    len(np.mean(np.cumsum(regret['UCB1'].T, axis=0), axis=1))-1)
+                    len(np.mean(np.cumsum(regret['UCB1Agent'].T, axis=0), axis=1))-1)
         f, ax = plt.subplots(1, figsize=(20, 10))
         sqrtn = np.sqrt(param_dict['n_epochs'])
 
