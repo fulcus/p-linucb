@@ -51,14 +51,14 @@ if __name__ == '__main__':
                                  context_set=param_dict["context_set"],
                                  theta=param_dict["theta"],
                                  theta_p=param_dict["theta_p"],
-                                 psi=psi_ctx,
+                                 psi=psi_lin,
                                  sigma=param_dict['sigma'],
                                  random_state=param_dict['seed'])
 
         # Clairvoyant
         agent = Clairvoyant(arms=param_dict["arms"],
                             theta=param_dict["theta"],
-                            psi=psi_ctx,
+                            psi=psi_lin,
                             theta_p=param_dict["theta_p"],
                             context_set=param_dict["context_set"])
         core = Core(env, agent)
@@ -111,16 +111,15 @@ if __name__ == '__main__':
                                param_dict["max_arm_norm"],
                                param_dict['sigma'],
                                param_dict['seed']),
-            ProductContextualAgent(param_dict["arms"],
-                               param_dict["context_set"],
-                               psi_ctx,
-                               param_dict["horizon"],
-                               1,
-                               param_dict["max_theta_norm"],
-                               param_dict["max_arm_norm"],
-                               param_dict['sigma'],
-                               param_dict['seed']),
-
+            # ProductContextualAgent(param_dict["arms"],
+            #                        param_dict["context_set"],
+            #                        psi_ctx,
+            #                        param_dict["horizon"],
+            #                        1,
+            #                        param_dict["max_theta_norm"],
+            #                        param_dict["max_arm_norm"],
+            #                        param_dict['sigma'],
+            #                        param_dict['seed']),
         ]
 
         # Train all agents

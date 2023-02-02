@@ -86,6 +86,8 @@ class LinUCBAgent(Agent):
         self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
+        self.last_pull_i = 0
+        self.arm_pull_count = {a_i: arms.shape[1] for a_i in range(len(arms))}
         super().__init__(arms, random_state)
 
     def reset(self):
@@ -95,15 +97,16 @@ class LinUCBAgent(Agent):
         self.theta_hat = np.zeros((self.arm_dim, 1))
         self.last_ucb = np.zeros(self.n_arms)
         self.first = True
+        self.last_pull_i = 0
+        self.arm_pull_count = {
+            a_i: self.arms.shape[1] for a_i in range(len(self.arms))}
         return self
 
     def pull_arm(self, context_i=None):
         if self.first:
-            np.random.seed(self.random_state)
-            self.last_pull_i = int(np.random.uniform(high=self.n_arms))
-            self.first = False
+            self._pull_round_robin()
         else:
-            _, self.last_pull_i = self._estimate_linucb_arm()
+            self.last_pull_i = self._estimate_linucb_arm()
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
@@ -120,7 +123,7 @@ class LinUCBAgent(Agent):
             arm = arm.reshape(self.arm_dim, 1)
             self.last_ucb[i] = (self.theta_hat.T @ arm + bound
                                 * np.sqrt(arm.T @ np.linalg.inv(self.V_t) @ arm))
-        return self.arms[np.argmax(self.last_ucb), :], np.argmax(self.last_ucb)
+        return np.argmax(self.last_ucb)
 
     def _beta_t_fun_linucb(self):
         return (self.max_theta_norm * np.sqrt(self.lmbd)
@@ -130,6 +133,16 @@ class LinUCBAgent(Agent):
                      + self.horizon * (self.max_arm_norm ** 2))
                     / (self.arm_dim * self.lmbd)
                 ))))
+
+    def _pull_round_robin(self):
+        """pull each arm dim_arm times"""
+        if self.arm_pull_count[self.last_pull_i] > 0:
+            self.arm_pull_count[self.last_pull_i] -= 1
+        else:
+            if self.last_pull_i == self.arms.shape[1] - 1:
+                self.first = False
+            else:
+                self.last_pull_i += 1
 
 
 class ContextualLinUCBAgent(LinUCBAgent):
@@ -143,11 +156,9 @@ class ContextualLinUCBAgent(LinUCBAgent):
     def pull_arm(self, context_i):
         self.last_context = self.context_set[context_i]
         if self.first:
-            np.random.seed(self.random_state)
-            self.last_pull_i = int(np.random.uniform(high=self.n_arms))
-            self.first = False
+            self._pull_round_robin()
         else:
-            _, self.last_pull_i = self._estimate_linucb_arm()
+            self.last_pull_i = self._estimate_linucb_arm()
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
@@ -166,7 +177,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
             psi = psi.reshape(self.arm_dim, 1)
             self.last_ucb[i] = (self.theta_hat.T @ psi + bound
                                 * np.sqrt(psi.T @ np.linalg.inv(self.V_t) @ psi))
-        return self.arms[np.argmax(self.last_ucb), :], np.argmax(self.last_ucb)
+        return np.argmax(self.last_ucb)
 
 
 class INDUCB1Agent(Agent):
@@ -258,6 +269,7 @@ class ProductContextualAgent(Agent):
         # compute and combine their ucb
         self.agent_global.pull_arm(context_i)
         self.context_agent[context_i].pull_arm()
+
         ucb = (self.agent_global.last_ucb
                + self.context_agent[context_i].last_ucb)
         self.last_pull_i = np.argmax(ucb)
