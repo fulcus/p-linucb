@@ -9,6 +9,7 @@ import argparse
 import warnings
 import json
 import os
+import time
 
 
 if __name__ == '__main__':
@@ -27,6 +28,7 @@ if __name__ == '__main__':
     test_files = os.listdir(
         in_dir) if args.test_file is None else [args.test_file]
 
+    start_time = time.time()
     for testcase in test_files:
         print(f'################## Testcase {testcase} ###################')
 
@@ -37,6 +39,43 @@ if __name__ == '__main__':
         for k, v in param_dict.items():
             if type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
+
+        logs = {}
+        a_hists = {}
+        if "theta_p" in param_dict:
+            print("Product Setting")
+            theta_p = param_dict["theta_p"]
+            env = ProductEnvironment(n_rounds=param_dict["horizon"],
+                                     arms=param_dict["arms"],
+                                     context_set=param_dict["context_set"],
+                                     theta=param_dict["theta"],
+                                     theta_p=theta_p,
+                                     sigma=param_dict['sigma'],
+                                     random_state=param_dict['seed'])
+        else:
+            print("Contextual Setting")
+            theta_p = None
+            env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
+                                              arms=param_dict["arms"],
+                                              theta=param_dict["theta"],
+                                              context_set=param_dict["context_set"],
+                                              sigma=param_dict['sigma'],
+                                              random_state=param_dict['seed'])
+
+        # Clairvoyant
+        print('Training Clairvoyant Algorithm')
+        agent = Clairvoyant(arms=param_dict["arms"],
+                            theta=param_dict["theta"],
+                            theta_p=theta_p,
+                            context_set=param_dict["context_set"])
+        env.reset()
+        core = Core(env, agent)
+        # rewards, arms
+        clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
+            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
+
+        # Reward upper bound
+        max_reward = clairvoyant_logs.max()
 
         agents_list = [
             UCB1Agent(param_dict["arms"],
@@ -78,43 +117,6 @@ if __name__ == '__main__':
                                param_dict['seed'])
         ]
 
-        logs = {}
-        a_hists = {}
-        if "theta_p" in param_dict:
-            print("Product Setting")
-            theta_p = param_dict["theta_p"]
-            env = ProductEnvironment(n_rounds=param_dict["horizon"],
-                                     arms=param_dict["arms"],
-                                     context_set=param_dict["context_set"],
-                                     theta=param_dict["theta"],
-                                     theta_p=theta_p,
-                                     sigma=param_dict['sigma'],
-                                     random_state=param_dict['seed'])
-        else:
-            print("Contextual Setting")
-            theta_p = None
-            env = ContextualLinearEnvironment(n_rounds=param_dict["horizon"],
-                                              arms=param_dict["arms"],
-                                              theta=param_dict["theta"],
-                                              context_set=param_dict["context_set"],
-                                              sigma=param_dict['sigma'],
-                                              random_state=param_dict['seed'])
-
-        # Clairvoyant
-        print('Training Clairvoyant Algorithm')
-        agent = Clairvoyant(arms=param_dict["arms"],
-                            theta=param_dict["theta"],
-                            theta_p=theta_p,
-                            context_set=param_dict["context_set"])
-        env.reset()
-        core = Core(env, agent)
-        # rewards, arms
-        clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
-            n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-
-        # Reward upper bound
-        max_reward = clairvoyant_logs.max()
-
         # Train all agents
         for agent in agents_list:
             agent_name = agent.__class__.__name__
@@ -122,7 +124,9 @@ if __name__ == '__main__':
             core = Core(env, agent)
             logs[agent_name], a_hists[agent_name] = core.simulation(
                 n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
-
+            print(f"Finished in {time.time() - start_time:.2f} s")
+            start_time = time.time()
+        
         # Regrets computing
         print('Computing regrets...')
         clairvoyant_logs = clairvoyant_logs.astype(np.float64)

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from random import Random
 
 
 class Agent(ABC):
@@ -104,12 +103,7 @@ class LinUCBAgent(Agent):
         self.first = True
         return self
 
-    def pull_arm(self, context_i=None, arm_i=None):
-        if arm_i is not None:
-            self.a_hist.append(arm_i)
-            self.last_pull_i = arm_i
-            return self.last_pull_i
-
+    def pull_arm(self, context_i=None):
         if self.first:
             np.random.seed(self.random_state)
             self.last_pull_i = int(np.random.uniform(high=self.n_arms))
@@ -148,6 +142,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
     def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma=1, random_state=1):
         self.context_set = context_set
+        # TODO phi with cart prod, context dim 4, action 1
         if psi is None:
             self.psi = lambda a, x: np.multiply(a, x)
         else:
@@ -155,13 +150,8 @@ class ContextualLinUCBAgent(LinUCBAgent):
         super().__init__(arms, horizon, lmbd,
                          max_theta_norm, max_arm_norm, sigma, random_state)
 
-    def pull_arm(self, context_i, arm_i=None):
+    def pull_arm(self, context_i):
         self.last_context = self.context_set[context_i]
-        if arm_i is not None:
-            self.a_hist.append(arm_i)
-            self.last_pull_i = arm_i
-            return self.last_pull_i
-
         if self.first:
             np.random.seed(self.random_state)
             self.last_pull_i = int(np.random.uniform(high=self.n_arms))
@@ -229,11 +219,10 @@ class INDLinUCBAgent(Agent):
 
 class ProductLinUCBAgent(Agent):
     """Combines a global linear bandit and an independent instance per context"""
-    # TODO swap global linucb with contextual
-    # with phi (cart prod), context dim 4, action 1
 
     def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma, random_state=1):
+        self.psi = psi
         self.context_set = context_set
         self.lmbd = lmbd
         self.horizon = horizon
@@ -245,11 +234,16 @@ class ProductLinUCBAgent(Agent):
     def pull_arm(self, context_i):
         """arm = argmax (theta * arm + theta_p * arm)"""
         self.last_context_i = context_i
-        ucb = self.agent_global.last_ucb + \
-            self.context_agent[context_i].last_ucb
+
+        # compute and combine their ucb
+        self.agent_global.pull_arm(context_i)
+        self.context_agent[context_i].pull_arm()
+        ucb = (self.agent_global.last_ucb
+               + self.context_agent[context_i].last_ucb)
         self.last_pull_i = np.argmax(ucb)
-        self.agent_global.pull_arm(arm_i=self.last_pull_i)
-        self.context_agent[context_i].pull_arm(arm_i=self.last_pull_i)
+
+        self.agent_global.last_pull_i = self.last_pull_i
+        self.context_agent[context_i].last_pull_i = self.last_pull_i
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
@@ -261,8 +255,8 @@ class ProductLinUCBAgent(Agent):
 
     def reset(self):
         super().reset()
-        self.agent_global = LinUCBAgent(
-            self.arms, self.horizon, self.lmbd,
+        self.agent_global = ContextualLinUCBAgent(
+            self.arms, self.context_set, self.psi, self.horizon, self.lmbd,
             self.max_theta_norm, self.max_arm_norm, self.random_state)
         self.context_agent = [
             LinUCBAgent(

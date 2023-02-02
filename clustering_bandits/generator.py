@@ -17,7 +17,8 @@ if __name__ == '__main__':
 
     dim_arm = n_arms
     # np.random.seed(args.seed)
-    # arms = np.random.randint(0, 101, (n_arms, dim_arm))
+    # arms = np.random.randint(0, 100, (n_arms, dim_arm))
+    # arms = np.array([[i] for i in range(n_arms)])
     arms = np.eye(dim_arm)
     np.random.seed()
     theta = np.random.uniform(-1.0, 1.0, size=(1, dim_arm))
@@ -26,11 +27,11 @@ if __name__ == '__main__':
     params = {
         "horizon": 1000,
         "n_epochs": 10,
-        "sigma": 0.01,
+        "sigma": 0.1,
         "seed": args.seed,
+        "n_arms": n_arms,
         "max_arm_norm": max_arm_norm,
         "max_theta_norm": max_theta_norm,
-        "n_arms": arms.shape[1],
         "arms": arms.tolist(),
         "theta": theta.tolist()
     }
