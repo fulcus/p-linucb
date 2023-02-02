@@ -27,14 +27,11 @@ class Agent(ABC):
 class Clairvoyant(Agent):
     """Always pulls the optimal arm"""
 
-    def __init__(self, arms, theta, theta_p=None, context_set=None, psi=None, random_state=1):
+    def __init__(self, arms, theta, psi, theta_p, context_set, random_state=1):
         self.context_set = context_set
         self.theta = theta
         self.theta_p = theta_p
-        if psi is None:
-            self.psi = lambda a, x: np.multiply(a, x)
-        else:
-            self.psi = psi
+        self.psi = psi
         super().__init__(arms, random_state)
 
     def pull_arm(self, context_i):
@@ -42,11 +39,8 @@ class Clairvoyant(Agent):
         context = self.context_set[context_i]
         for i, arm in enumerate(self.arms):
             psi = self.psi(arm, context)
-            if self.theta_p is None:
-                exp_rewards[i] = self.theta @ psi
-            else:
-                exp_rewards[i] = (self.theta @ psi
-                                  + self.theta_p[context_i] @ psi)
+            exp_rewards[i] = (self.theta @ psi
+                              + self.theta_p[context_i] @ psi)
         self.last_pull_i = np.argmax(exp_rewards)
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
@@ -142,11 +136,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
     def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma=1, random_state=1):
         self.context_set = context_set
-        # TODO phi with cart prod, context dim 4, action 1
-        if psi is None:
-            self.psi = lambda a, x: np.multiply(a, x)
-        else:
-            self.psi = psi
+        self.psi = psi
         super().__init__(arms, horizon, lmbd,
                          max_theta_norm, max_arm_norm, sigma, random_state)
 
@@ -194,7 +184,7 @@ class INDUCB1Agent(Agent):
                 self.arms,
                 self.max_reward,
                 self.random_state)
-            for _ in self.context_set
+            for _ in range(len(self.context_set))
         ]
 
     def pull_arm(self, context_i):
@@ -211,7 +201,7 @@ class INDUCB1Agent(Agent):
 class INDLinUCBAgent(Agent):
     """One independent LinUCBAgent instance per context"""
 
-    def __init__(self, arms, context_set, psi, horizon, lmbd,
+    def __init__(self, arms, context_set, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma=1, random_state=1):
         self.context_set = context_set
         self.lmbd = lmbd
@@ -232,7 +222,7 @@ class INDLinUCBAgent(Agent):
                 self.max_arm_norm,
                 self.sigma,
                 self.random_state)
-            for _ in self.context_set
+            for _ in range(len(self.context_set))
         ]
 
     def pull_arm(self, context_i):
@@ -246,18 +236,19 @@ class INDLinUCBAgent(Agent):
         self.context_agent[self.last_context_i].update(reward)
 
 
-class ProductLinUCBAgent(Agent):
-    """Combines a global linear bandit and an independent instance per context"""
+class ProductContextualAgent(Agent):
+    """Combines a global (contextual) linear bandit 
+    and an independent linear bandit per context"""
 
     def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma, random_state=1):
-        self.psi = psi
         self.context_set = context_set
         self.lmbd = lmbd
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
+        self.psi = psi
         super().__init__(arms, random_state)
 
     def pull_arm(self, context_i):
@@ -278,7 +269,9 @@ class ProductLinUCBAgent(Agent):
 
     def update(self, reward):
         self.agent_global.update(reward)
-        pred_reward = self.agent_global.theta_hat.T @ self.arms[self.agent_global.last_pull_i]
+        psi = self.psi(self.arms[self.agent_global.last_pull_i],
+                       self.context_set[self.last_context_i])
+        pred_reward = self.agent_global.theta_hat.T @ psi
         residual = reward - pred_reward
         self.context_agent[self.last_context_i].update(residual)
 
@@ -292,5 +285,16 @@ class ProductLinUCBAgent(Agent):
                 self.arms, self.horizon,
                 self.lmbd, self.max_theta_norm,
                 self.max_arm_norm, self.random_state)
-            for _ in self.context_set
+            for _ in range(len(self.context_set))
         ]
+
+
+class ProductLinearAgent(ProductContextualAgent):
+    """Combines a global linear bandit 
+    and an independent linear bandit per context"""
+
+    def __init__(self, arms, context_set, horizon, lmbd,
+                 max_theta_norm, max_arm_norm, sigma, random_state=1):
+        def psi(a, x): return a
+        super().__init__(arms, context_set, psi, horizon, lmbd,
+                         max_theta_norm, max_arm_norm, sigma, random_state)

@@ -2,9 +2,6 @@ import numpy as np
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor
 
-from src.environment import ContextualLinearEnvironment
-from src.agents import ContextualLinUCBAgent, ProductLinUCBAgent
-
 
 class Core:
     def __init__(self, environment, agent):
