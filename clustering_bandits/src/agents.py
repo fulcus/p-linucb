@@ -3,9 +3,8 @@ import numpy as np
 
 
 class Agent(ABC):
-    def __init__(self, arms, random_state=1):
+    def __init__(self, arms):
         self.arms = arms
-        self.random_state = random_state
         self.n_arms = arms.shape[0]
         self.arm_dim = arms.shape[1]
         self.reset()
@@ -27,12 +26,12 @@ class Agent(ABC):
 class Clairvoyant(Agent):
     """Always pulls the optimal arm"""
 
-    def __init__(self, arms, theta, psi, theta_p, context_set, random_state=1):
+    def __init__(self, arms, theta, psi, theta_p, context_set):
         self.context_set = context_set
         self.theta = theta
         self.theta_p = theta_p
         self.psi = psi
-        super().__init__(arms, random_state)
+        super().__init__(arms)
 
     def pull_arm(self, context_i):
         exp_rewards = np.zeros(self.n_arms)
@@ -50,9 +49,9 @@ class Clairvoyant(Agent):
 
 
 class UCB1Agent(Agent):
-    def __init__(self, arms, max_reward=1, random_state=1):
+    def __init__(self, arms, max_reward=1):
         self.max_reward = max_reward
-        super().__init__(arms, random_state)
+        super().__init__(arms)
 
     def reset(self):
         super().reset()
@@ -79,7 +78,7 @@ class UCB1Agent(Agent):
 
 class LinUCBAgent(Agent):
     def __init__(self, arms, horizon, lmbd,
-                 max_theta_norm, max_arm_norm, sigma=1, random_state=1):
+                 max_theta_norm, max_arm_norm, sigma=1):
         assert lmbd > 0
         self.lmbd = lmbd
         self.horizon = horizon
@@ -88,7 +87,7 @@ class LinUCBAgent(Agent):
         self.sigma = sigma
         self.last_pull_i = 0
         self.arm_pull_count = {a_i: arms.shape[1] for a_i in range(len(arms))}
-        super().__init__(arms, random_state)
+        super().__init__(arms)
 
     def reset(self):
         super().reset()
@@ -147,11 +146,11 @@ class LinUCBAgent(Agent):
 
 class ContextualLinUCBAgent(LinUCBAgent):
     def __init__(self, arms, context_set, psi, horizon, lmbd,
-                 max_theta_norm, max_arm_norm, sigma=1, random_state=1):
+                 max_theta_norm, max_arm_norm, sigma=1):
         self.context_set = context_set
         self.psi = psi
         super().__init__(arms, horizon, lmbd,
-                         max_theta_norm, max_arm_norm, sigma, random_state)
+                         max_theta_norm, max_arm_norm, sigma)
 
     def pull_arm(self, context_i):
         self.last_context = self.context_set[context_i]
@@ -183,18 +182,17 @@ class ContextualLinUCBAgent(LinUCBAgent):
 class INDUCB1Agent(Agent):
     """One independent UCB1Agent instance per context"""
 
-    def __init__(self, arms, context_set, max_reward=1, random_state=1):
+    def __init__(self, arms, context_set, max_reward=1):
         self.context_set = context_set
         self.max_reward = max_reward
-        super().__init__(arms, random_state)
+        super().__init__(arms)
 
     def reset(self):
         super().reset()
         self.context_agent = [
             UCB1Agent(
                 self.arms,
-                self.max_reward,
-                self.random_state)
+                self.max_reward)
             for _ in range(len(self.context_set))
         ]
 
@@ -213,14 +211,14 @@ class INDLinUCBAgent(Agent):
     """One independent LinUCBAgent instance per context"""
 
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm, max_arm_norm, sigma=1, random_state=1):
+                 max_theta_norm, max_arm_norm, sigma=1):
         self.context_set = context_set
         self.lmbd = lmbd
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
-        super().__init__(arms, random_state)
+        super().__init__(arms)
 
     def reset(self):
         super().reset()
@@ -231,8 +229,7 @@ class INDLinUCBAgent(Agent):
                 self.lmbd,
                 self.max_theta_norm,
                 self.max_arm_norm,
-                self.sigma,
-                self.random_state)
+                self.sigma)
             for _ in range(len(self.context_set))
         ]
 
@@ -252,7 +249,7 @@ class ProductContextualAgent(Agent):
     and an independent linear bandit per context"""
 
     def __init__(self, arms, context_set, psi, horizon, lmbd,
-                 max_theta_norm, max_arm_norm, sigma, random_state=1):
+                 max_theta_norm, max_arm_norm, sigma):
         self.context_set = context_set
         self.lmbd = lmbd
         self.horizon = horizon
@@ -260,7 +257,7 @@ class ProductContextualAgent(Agent):
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
         self.psi = psi
-        super().__init__(arms, random_state)
+        super().__init__(arms)
 
     def pull_arm(self, context_i):
         """arm = argmax (theta * arm + theta_p * arm)"""
@@ -291,12 +288,12 @@ class ProductContextualAgent(Agent):
         super().reset()
         self.agent_global = ContextualLinUCBAgent(
             self.arms, self.context_set, self.psi, self.horizon, self.lmbd,
-            self.max_theta_norm, self.max_arm_norm, self.random_state)
+            self.max_theta_norm, self.max_arm_norm)
         self.context_agent = [
             LinUCBAgent(
                 self.arms, self.horizon,
                 self.lmbd, self.max_theta_norm,
-                self.max_arm_norm, self.random_state)
+                self.max_arm_norm)
             for _ in range(len(self.context_set))
         ]
 
@@ -306,7 +303,7 @@ class ProductLinearAgent(ProductContextualAgent):
     and an independent linear bandit per context"""
 
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm, max_arm_norm, sigma, random_state=1):
+                 max_theta_norm, max_arm_norm, sigma):
         def psi(a, x): return a
         super().__init__(arms, context_set, psi, horizon, lmbd,
-                         max_theta_norm, max_arm_norm, sigma, random_state)
+                         max_theta_norm, max_arm_norm, sigma)
