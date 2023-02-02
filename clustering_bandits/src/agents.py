@@ -179,6 +179,35 @@ class ContextualLinUCBAgent(LinUCBAgent):
         return self.arms[np.argmax(self.last_ucb), :], np.argmax(self.last_ucb)
 
 
+class INDUCB1Agent(Agent):
+    """One independent UCB1Agent instance per context"""
+
+    def __init__(self, arms, context_set, max_reward=1, random_state=1):
+        self.context_set = context_set
+        self.max_reward = max_reward
+        super().__init__(arms, random_state)
+
+    def reset(self):
+        super().reset()
+        self.context_agent = [
+            UCB1Agent(
+                self.arms,
+                self.max_reward,
+                self.random_state)
+            for _ in self.context_set
+        ]
+
+    def pull_arm(self, context_i):
+        """arm = argmax (theta * arm + theta_p * arm)"""
+        self.last_context_i = context_i
+        arm_i = self.context_agent[context_i].pull_arm()
+        self.a_hist.append(arm_i)
+        return arm_i
+
+    def update(self, reward):
+        self.context_agent[self.last_context_i].update(reward)
+
+
 class INDLinUCBAgent(Agent):
     """One independent LinUCBAgent instance per context"""
 

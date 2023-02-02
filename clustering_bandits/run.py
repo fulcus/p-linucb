@@ -63,7 +63,7 @@ if __name__ == '__main__':
                                               random_state=param_dict['seed'])
 
         # Clairvoyant
-        print('Training Clairvoyant Algorithm')
+        print('Training Clairvoyant')
         agent = Clairvoyant(arms=param_dict["arms"],
                             theta=param_dict["theta"],
                             theta_p=theta_p,
@@ -97,6 +97,10 @@ if __name__ == '__main__':
                                   param_dict["max_arm_norm"],
                                   param_dict['sigma'],
                                   param_dict['seed']),
+            INDUCB1Agent(param_dict["arms"],
+                         param_dict["context_set"],
+                         max_reward,
+                         param_dict['seed']),
             INDLinUCBAgent(param_dict["arms"],
                            param_dict["context_set"],
                            None,
@@ -120,13 +124,13 @@ if __name__ == '__main__':
         # Train all agents
         for agent in agents_list:
             agent_name = agent.__class__.__name__
-            print(f"Training {agent_name}")
+            print(f"Training {agent_name}", end=" - ")
             core = Core(env, agent)
             logs[agent_name], a_hists[agent_name] = core.simulation(
                 n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
-            print(f"Finished in {time.time() - start_time:.2f} s")
+            print(f"{time.time() - start_time:.2f} s")
             start_time = time.time()
-        
+
         # Regrets computing
         print('Computing regrets...')
         clairvoyant_logs = clairvoyant_logs.astype(np.float64)
