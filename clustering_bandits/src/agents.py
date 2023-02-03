@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from src.utils import psi_lin
 
 
 class Agent(ABC):
@@ -319,7 +320,7 @@ class ProductLinearAgent(ProductContextualAgent):
     def __init__(self, arms, context_set, horizon, lmbd,
                  max_theta_norm_shared, max_theta_norm_p,
                  max_arm_norm, sigma):
-        def psi(a, x): return a
+        psi = psi_lin
         super().__init__(arms, context_set, psi, horizon, lmbd,
                          max_theta_norm_shared, max_theta_norm_p,
                          max_arm_norm, sigma)

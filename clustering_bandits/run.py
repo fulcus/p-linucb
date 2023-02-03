@@ -1,34 +1,16 @@
 from src.agents import *
 from src.environment import ProductEnvironment
 from src.core import Core
-
+from src.utils import save_heatmap, psi_lin, psi_ctx
 import matplotlib.pyplot as plt
 import numpy as np
-import tikzplotlib as tikz
 import argparse
 import warnings
 import json
 import os
 import time
-import pandas as pd
-import seaborn as sns
 
-
-def save_heatmap(fpath, arms, context_set, theta, theta_p):
-    dict = {}
-    for a_i, arm in enumerate(arms):
-        dict[a_i] = []
-        for c_i in range(len(context_set)):
-            psi = arm  # non-contextual
-            dict[a_i].append(round((theta + theta_p[c_i]) @ psi, 2))
-
-    df = pd.DataFrame.from_dict(dict)
-    sns.heatmap(df, annot=False)
-    plt.savefig(fpath)
-
-    # plt.show()
-    # df.to_csv(out_dir + 'table.csv')
-    # exit(0)
+os.environ['PYTHONWARNINGS'] = 'ignore::RuntimeWarning'
 
 
 if __name__ == '__main__':
@@ -65,9 +47,6 @@ if __name__ == '__main__':
 
         logs = {}
         a_hists = {}
-
-        def psi_lin(a, x): return a
-        def psi_ctx(a, x): return np.multiply(a, x)
 
         env = ProductEnvironment(n_rounds=param_dict["horizon"],
                                  arms=param_dict["arms"],

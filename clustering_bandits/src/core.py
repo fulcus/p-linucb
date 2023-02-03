@@ -8,22 +8,21 @@ class Core:
         self.environment = environment
         self.agent = agent
 
-    def simulation(self, n_epochs, n_rounds, parallel=False):
+    def simulation(self, n_epochs, n_rounds, parallel=True):
         args = [(deepcopy(self.agent), deepcopy(
             self.environment.reset(i)), n_rounds) for i in range(n_epochs)]
         rewards = []
         a_hists = []
         if parallel:
             with ProcessPoolExecutor(max_workers=4) as executor:
-                for result in executor.map(self.helper, args):
-                    rewards.append(result[0])
-                    a_hists.append(result[1])
+                for rews_epoch, actions_epoch in executor.map(self.helper, args):
+                    rewards.append(rews_epoch)
+                    a_hists.append(actions_epoch)
         else:
             for arg in args:
-                result = self.helper(arg)
-                # result[0] list of rewards
-                rewards.append(result[0])
-                a_hists.append(result[1])
+                rews_epoch, actions_epoch = self.helper(arg)
+                rewards.append(rews_epoch)
+                a_hists.append(actions_epoch)
         return np.array(rewards), np.array(a_hists)
 
     def helper(self, arg):
@@ -36,4 +35,4 @@ class Core:
             environment.round(new_a)
             agent.update(
                 environment.rewards[-1])
-        return (environment.rewards, agent.a_hist)
+        return environment.rewards, agent.a_hist
