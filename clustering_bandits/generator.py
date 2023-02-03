@@ -43,33 +43,41 @@ if __name__ == '__main__':
     elif args.arm == 'r':
         n_arms = 5
         arms = random_arms(n_arms, dim_arm, args.seed)
-    
+
     max_arm_norm = math.ceil(np.max([np.linalg.norm(a) for a in arms]))
+
     np.random.seed(args.seed)
     theta = np.random.uniform(-3.0, 3.0, size=(1, dim_arm)).round(2).tolist()
-    max_theta_norm = math.ceil(np.linalg.norm(theta))
-    np.random.seed(args.seed)
-    context_set = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
-    context_set = context_set.round(2).tolist()
     np.random.seed(args.seed)
     theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
     theta_p = theta_p.round(2).tolist()
 
+    # only valid for v arms
+    max_theta_norm_shared = math.ceil(math.sqrt(dim_arm) * 3)
+    max_theta_norm_p = math.ceil(math.sqrt(dim_arm) * 1)
+    max_theta_norm_sum = math.ceil(math.sqrt(dim_arm) * 4)
+
+    np.random.seed(args.seed)
+    context_set = np.random.uniform(-1.0, 1.0, size=(n_contexts, dim_arm))
+    context_set = context_set.round(2).tolist()
+
     params = {
         "horizon": 10000,
         "n_epochs": 10,
-        "sigma": 0.1,
+        "sigma": 0.00001,
         "seed": args.seed,
         "n_arms": n_arms,
         "max_arm_norm": max_arm_norm,
-        "max_theta_norm": max_theta_norm,
+        "max_theta_norm_sum": max_theta_norm_sum,
+        "max_theta_norm_shared": max_theta_norm_shared,
+        "max_theta_norm_p": max_theta_norm_p,
         "arms": arms,
         "theta": theta,
         "context_set": context_set,
         "theta_p": theta_p
     }
 
-    filename = f"testcase_{args.arm}_{args.seed}.json"
+    filename = f"{args.arm}_{args.seed}.json"
     out_folder = 'clustering_bandits/test/input/'
     os.makedirs(out_folder, exist_ok=True)
     with open(out_folder + filename, "w") as f:

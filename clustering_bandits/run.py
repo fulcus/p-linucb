@@ -10,6 +10,25 @@ import warnings
 import json
 import os
 import time
+import pandas as pd
+import seaborn as sns
+
+
+def save_heatmap(fpath, arms, context_set, theta, theta_p):
+    dict = {}
+    for a_i, arm in enumerate(arms):
+        dict[a_i] = []
+        for c_i in range(len(context_set)):
+            psi = arm  # non-contextual
+            dict[a_i].append(round((theta + theta_p[c_i]) @ psi, 2))
+
+    df = pd.DataFrame.from_dict(dict)
+    sns.heatmap(df, annot=False)
+    plt.savefig(fpath)
+
+    # plt.show()
+    # df.to_csv(out_dir + 'table.csv')
+    # exit(0)
 
 
 if __name__ == '__main__':
@@ -30,7 +49,7 @@ if __name__ == '__main__':
 
     start_all_time = start_time = time.time()
     for testcase in test_files:
-        print(f'################## Testcase {testcase} ###################')
+        print(f'############## {testcase} ##############')
 
         with open(f'{in_dir}{testcase}') as f:
             param_dict = json.load(f)
@@ -39,6 +58,10 @@ if __name__ == '__main__':
         for k, v in param_dict.items():
             if type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
+
+        save_heatmap(out_dir + 'png/' + testcase + '_heat',
+                     param_dict["arms"], param_dict["context_set"],
+                     param_dict["theta"], param_dict["theta_p"])
 
         logs = {}
         a_hists = {}
@@ -77,40 +100,42 @@ if __name__ == '__main__':
             LinUCBAgent(param_dict["arms"],
                         param_dict["horizon"],
                         1,
-                        param_dict["max_theta_norm"],
+                        param_dict["max_theta_norm_sum"],
                         param_dict["max_arm_norm"],
                         param_dict['sigma']),
-            ContextualLinUCBAgent(param_dict["arms"],
-                                  param_dict["context_set"],
-                                  psi_ctx,
-                                  param_dict["horizon"],
-                                  1,
-                                  param_dict["max_theta_norm"],
-                                  param_dict["max_arm_norm"],
-                                  param_dict['sigma']),
-            INDUCB1Agent(param_dict["arms"],
-                         param_dict["context_set"],
-                         max_reward),
+            # INDUCB1Agent(param_dict["arms"],
+            #              param_dict["context_set"],
+            #              max_reward),
             INDLinUCBAgent(param_dict["arms"],
                            param_dict["context_set"],
                            param_dict["horizon"],
                            1,
-                           param_dict["max_theta_norm"],
+                           8,
                            param_dict["max_arm_norm"],
                            param_dict['sigma']),
             ProductLinearAgent(param_dict["arms"],
                                param_dict["context_set"],
                                param_dict["horizon"],
                                1,
-                               param_dict["max_theta_norm"],
+                               param_dict["max_theta_norm_shared"],
+                               param_dict["max_theta_norm_p"],
                                param_dict["max_arm_norm"],
                                param_dict['sigma']),
+            # ContextualLinUCBAgent(param_dict["arms"],
+            #                       param_dict["context_set"],
+            #                       psi_ctx,
+            #                       param_dict["horizon"],
+            #                       1,
+            #                       param_dict["max_theta_norm_sum"],
+            #                       param_dict["max_arm_norm"],
+            #                       param_dict['sigma']),
             # ProductContextualAgent(param_dict["arms"],
             #                        param_dict["context_set"],
             #                        psi_ctx,
             #                        param_dict["horizon"],
             #                        1,
-            #                        param_dict["max_theta_norm"],
+            #                        param_dict["max_theta_norm_shared"],
+            #                        param_dict["max_theta_norm_p"],
             #                        param_dict["max_arm_norm"],
             #                        param_dict['sigma']),
         ]
