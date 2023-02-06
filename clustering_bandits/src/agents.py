@@ -7,6 +7,7 @@ class Agent(ABC):
     def __init__(self, arms, context_set):
         self.arms = arms
         self.context_set = context_set
+        self.n_contexts = context_set.shape[0]
         self.n_arms = arms.shape[0]
         self.arm_dim = arms.shape[1]
         self.reset()
@@ -32,7 +33,7 @@ class Agent(ABC):
         self.t = 0
         self.a_hist = []
         self.last_pull_i = None
-        self.last_pulls_i = np.zeros(self.context_set.shape[0], dtype=int)
+        self.last_pulls_i = np.zeros(self.n_contexts, dtype=int)
 
 
 class Clairvoyant(Agent):
@@ -101,7 +102,7 @@ class LinUCBAgent(Agent):
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
         self.last_pull_i = 0
-        self.arm_pull_count = {a_i: arms.shape[1] for a_i in range(len(arms))}
+        self.arm_pull_count = {a_i: self.arm_dim for a_i in range(self.n_arms)}
         super().__init__(arms, context_set)
 
     def reset(self):
@@ -113,7 +114,7 @@ class LinUCBAgent(Agent):
         self.first = True
         self.last_pull_i = 0
         self.arm_pull_count = {
-            a_i: self.arms.shape[1] for a_i in range(len(self.arms))}
+            a_i: self.arm_dim for a_i in range(self.n_arms)}
         return self
 
     def pull_arm(self, context_i=None):
@@ -155,7 +156,7 @@ class LinUCBAgent(Agent):
         if self.arm_pull_count[self.last_pull_i] > 0:
             self.arm_pull_count[self.last_pull_i] -= 1
         else:
-            if self.last_pull_i == self.arms.shape[1] - 1:
+            if self.last_pull_i == self.arm_dim - 1:
                 self.first = False
             else:
                 self.last_pull_i += 1
@@ -212,7 +213,7 @@ class INDUCB1Agent(Agent):
                 self.arms,
                 self.context_set,
                 self.max_reward)
-            for _ in range(len(self.context_set))
+            for _ in range(self.n_contexts)
         ]
 
     def pull_arm(self, context_i):
@@ -253,7 +254,7 @@ class INDLinUCBAgent(Agent):
                 self.max_theta_norm_sum,
                 self.max_arm_norm,
                 self.sigma)
-            for _ in range(len(self.context_set))
+            for _ in range(self.n_contexts)
         ]
 
     def pull_arm(self, context_i):
@@ -324,13 +325,13 @@ class ProductContextualAgent(Agent):
         self.agent_global = ContextualLinUCBAgent(
             self.arms, self.context_set, self.psi, self.horizon, self.lmbd,
             self.max_theta_norm_shared, self.max_arm_norm)
-        self.first_context_set = set([i for i in range(len(self.context_set))])
+        self.first_context_set = set([i for i in range(self.n_contexts)])
         self.context_agent = [
             LinUCBAgent(
                 self.arms, self.context_set, self.horizon,
                 self.lmbd, self.max_theta_norm_p,
                 self.max_arm_norm)
-            for _ in range(len(self.context_set))
+            for _ in range(self.n_contexts)
         ]
 
 

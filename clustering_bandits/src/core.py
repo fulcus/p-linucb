@@ -30,13 +30,9 @@ class Core:
 
     def epoch(self, agent, environment, n_rounds=10):
         for _ in range(n_rounds):
-            # x_i = environment.get_context()
             context_indexes = environment.get_contexts()
-            # new_a = agent.pull_arm(context_i=x_i)
             actions = agent.pull_arms(context_indexes)
             # actions: one row per context
-            # environment.round(new_a)
             rewards = environment.round_all(actions)
-            # agent.update(rewards)
             agent.update_arms(rewards)
         return environment.rewards, agent.a_hist
