@@ -59,10 +59,10 @@ if __name__ == '__main__':
 
         # Clairvoyant
         agent = Clairvoyant(arms=param_dict["arms"],
+                            context_set=param_dict["context_set"],
                             theta=param_dict["theta"],
                             psi=psi_lin,
-                            theta_p=param_dict["theta_p"],
-                            context_set=param_dict["context_set"])
+                            theta_p=param_dict["theta_p"])
         core = Core(env, agent)
         # rewards, arms
         clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
@@ -75,8 +75,10 @@ if __name__ == '__main__':
 
         agents_list = [
             UCB1Agent(param_dict["arms"],
+                      param_dict["context_set"],
                       max_reward),
             LinUCBAgent(param_dict["arms"],
+                        param_dict["context_set"],
                         param_dict["horizon"],
                         1,
                         param_dict["max_theta_norm_sum"],
@@ -132,7 +134,6 @@ if __name__ == '__main__':
         # Regrets computing
         print('Computing regrets...')
         clairvoyant_logs = clairvoyant_logs.astype(np.float64)
-
         regret = {label: np.inf *
                   np.ones((param_dict['n_epochs'], param_dict["horizon"])) for label in logs.keys()}
         for label in regret.keys():
@@ -181,8 +182,9 @@ if __name__ == '__main__':
 
         #  cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+50, step=50)
+        first_log = next(iter(regret.values()))
         x[-1] = min(x[-1],
-                    len(np.mean(np.cumsum(regret['UCB1Agent'].T, axis=0), axis=1))-1)
+                    len(np.mean(np.cumsum(first_log.T, axis=0), axis=1))-1)
         f, ax = plt.subplots(1, figsize=(20, 10))
         sqrtn = np.sqrt(param_dict['n_epochs'])
 

@@ -4,35 +4,45 @@ from src.utils import psi_lin
 
 
 class Agent(ABC):
-    def __init__(self, arms):
+    def __init__(self, arms, context_set):
         self.arms = arms
+        self.context_set = context_set
         self.n_arms = arms.shape[0]
         self.arm_dim = arms.shape[1]
         self.reset()
 
     @abstractmethod
-    def pull_arm(self):
+    def pull_arm(self, context_i):
         pass
+
+    def pull_arms(self, context_indexes):
+        for c_i in context_indexes:
+            self.last_pulls_i[c_i] = self.pull_arm(c_i)
+        return self.last_pulls_i
 
     @abstractmethod
     def update(self, reward, *args, **kwargs):
         pass
 
+    def update_arms(self, rewards):
+        for arm_i, reward in zip(self.last_pulls_i, rewards):
+            self.update(reward, arm_i=arm_i)
+
     def reset(self):
         self.t = 0
         self.a_hist = []
         self.last_pull_i = None
+        self.last_pulls_i = np.zeros(self.context_set.shape[0], dtype=int)
 
 
 class Clairvoyant(Agent):
     """Always pulls the optimal arm"""
 
-    def __init__(self, arms, theta, psi, theta_p, context_set):
-        self.context_set = context_set
+    def __init__(self, arms, context_set, theta, psi, theta_p):
         self.theta = theta
         self.theta_p = theta_p
         self.psi = psi
-        super().__init__(arms)
+        super().__init__(arms, context_set)
 
     def pull_arm(self, context_i):
         exp_rewards = np.zeros(self.n_arms)
@@ -45,14 +55,16 @@ class Clairvoyant(Agent):
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
-    def update(self, reward):
+    def update(self, reward, arm_i=None):
+        if arm_i is not None:
+            self.last_pull_i = arm_i
         self.t += 1
 
 
 class UCB1Agent(Agent):
-    def __init__(self, arms, max_reward=1):
+    def __init__(self, arms, context_set, max_reward=1):
         self.max_reward = max_reward
-        super().__init__(arms)
+        super().__init__(arms, context_set)
 
     def reset(self):
         super().reset()
@@ -69,16 +81,18 @@ class UCB1Agent(Agent):
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
-    def update(self, reward):
-        self.avg_reward[self.last_pull_i] = ((
-            self.avg_reward[self.last_pull_i]
-            * self.n_pulls[self.last_pull_i] + reward)
-            / (self.n_pulls[self.last_pull_i] + 1))
+    def update(self, reward, arm_i=None):
+        if arm_i is not None:
+            self.last_pull_i = arm_i
+        self.avg_reward[arm_i] = ((
+            self.avg_reward[arm_i]
+            * self.n_pulls[arm_i] + reward)
+            / (self.n_pulls[arm_i] + 1))
         self.t += 1
 
 
 class LinUCBAgent(Agent):
-    def __init__(self, arms, horizon, lmbd,
+    def __init__(self, arms, context_set, horizon, lmbd,
                  max_theta_norm_sum, max_arm_norm, sigma=1):
         assert lmbd > 0
         self.lmbd = lmbd
@@ -88,7 +102,7 @@ class LinUCBAgent(Agent):
         self.sigma = sigma
         self.last_pull_i = 0
         self.arm_pull_count = {a_i: arms.shape[1] for a_i in range(len(arms))}
-        super().__init__(arms)
+        super().__init__(arms, context_set)
 
     def reset(self):
         super().reset()
@@ -151,9 +165,8 @@ class LinUCBAgent(Agent):
 class ContextualLinUCBAgent(LinUCBAgent):
     def __init__(self, arms, context_set, psi, horizon, lmbd,
                  max_theta_norm_sum, max_arm_norm, sigma=1):
-        self.context_set = context_set
         self.psi = psi
-        super().__init__(arms, horizon, lmbd,
+        super().__init__(arms, context_set, horizon, lmbd,
                          max_theta_norm_sum, max_arm_norm, sigma)
 
     def pull_arm(self, context_i):
@@ -189,15 +202,15 @@ class INDUCB1Agent(Agent):
     """One independent UCB1Agent instance per context"""
 
     def __init__(self, arms, context_set, max_reward=1):
-        self.context_set = context_set
         self.max_reward = max_reward
-        super().__init__(arms)
+        super().__init__(arms, context_set)
 
     def reset(self):
         super().reset()
         self.context_agent = [
             UCB1Agent(
                 self.arms,
+                self.context_set,
                 self.max_reward)
             for _ in range(len(self.context_set))
         ]
@@ -209,8 +222,11 @@ class INDUCB1Agent(Agent):
         self.a_hist.append(arm_i)
         return arm_i
 
-    def update(self, reward):
-        self.context_agent[self.last_context_i].update(reward)
+    def update(self, reward, arm_i=None):
+        if arm_i is not None:
+            self.last_pull_i = arm_i
+        self.context_agent[self.last_context_i].update(
+            reward, self.last_pull_i)
 
 
 class INDLinUCBAgent(Agent):
@@ -224,13 +240,14 @@ class INDLinUCBAgent(Agent):
         self.max_theta_norm_sum = max_theta_norm_sum
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
-        super().__init__(arms)
+        super().__init__(arms, context_set)
 
     def reset(self):
         super().reset()
         self.context_agent = [
             LinUCBAgent(
                 self.arms,
+                self.context_set,
                 self.horizon,
                 self.lmbd,
                 self.max_theta_norm_sum,
@@ -246,8 +263,11 @@ class INDLinUCBAgent(Agent):
         self.a_hist.append(arm_i)
         return arm_i
 
-    def update(self, reward):
-        self.context_agent[self.last_context_i].update(reward)
+    def update(self, reward, arm_i=None):
+        if arm_i is not None:
+            self.last_pull_i = arm_i
+        self.context_agent[self.last_context_i].update(
+            reward, self.last_pull_i)
 
 
 class ProductContextualAgent(Agent):
@@ -256,7 +276,6 @@ class ProductContextualAgent(Agent):
 
     def __init__(self, arms, context_set, psi, horizon, lmbd, max_theta_norm_shared,
                  max_theta_norm_p, max_arm_norm, sigma):
-        self.context_set = context_set
         self.lmbd = lmbd
         self.horizon = horizon
         self.max_theta_norm_shared = max_theta_norm_shared
@@ -265,7 +284,7 @@ class ProductContextualAgent(Agent):
         self.sigma = sigma
         self.psi = psi
         self.first_context_set = set([i for i in range(len(context_set))])
-        super().__init__(arms)
+        super().__init__(arms, context_set)
 
     def pull_arm(self, context_i):
         """arm = argmax (theta * arm + theta_p * arm)"""
@@ -288,7 +307,9 @@ class ProductContextualAgent(Agent):
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
-    def update(self, reward):
+    def update(self, reward, arm_i=None):
+        if arm_i is not None:
+            self.last_pull_i = arm_i
         self.agent_global.update(reward, arm_i=self.last_pull_i)
         psi = self.psi(self.arms[self.agent_global.last_pull_i],
                        self.context_set[self.last_context_i])
@@ -306,7 +327,7 @@ class ProductContextualAgent(Agent):
         self.first_context_set = set([i for i in range(len(self.context_set))])
         self.context_agent = [
             LinUCBAgent(
-                self.arms, self.horizon,
+                self.arms, self.context_set, self.horizon,
                 self.lmbd, self.max_theta_norm_p,
                 self.max_arm_norm)
             for _ in range(len(self.context_set))

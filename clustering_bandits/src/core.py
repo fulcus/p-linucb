@@ -8,7 +8,7 @@ class Core:
         self.environment = environment
         self.agent = agent
 
-    def simulation(self, n_epochs, n_rounds, parallel=True):
+    def simulation(self, n_epochs, n_rounds, parallel=False):
         args = [(deepcopy(self.agent), deepcopy(
             self.environment.reset(i)), n_rounds) for i in range(n_epochs)]
         rewards = []
@@ -30,9 +30,13 @@ class Core:
 
     def epoch(self, agent, environment, n_rounds=10):
         for _ in range(n_rounds):
-            x_i = environment.get_context()
-            new_a = agent.pull_arm(context_i=x_i)
-            environment.round(new_a)
-            agent.update(
-                environment.rewards[-1])
+            # x_i = environment.get_context()
+            context_indexes = environment.get_contexts()
+            # new_a = agent.pull_arm(context_i=x_i)
+            actions = agent.pull_arms(context_indexes)
+            # actions: one row per context
+            # environment.round(new_a)
+            rewards = environment.round_all(actions)
+            # agent.update(rewards)
+            agent.update_arms(rewards)
         return environment.rewards, agent.a_hist
