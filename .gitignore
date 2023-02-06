@@ -1,5 +1,4 @@
-output/
-input/
+test/
 *.tex
 tex/
 .DS_Store
