@@ -5,6 +5,7 @@ from src.utils import psi_lin
 
 class Agent(ABC):
     def __init__(self, arms, context_set):
+        assert context_set.shape[1] == arms.shape[1]
         self.arms = arms
         self.context_set = context_set
         self.n_contexts = context_set.shape[0]

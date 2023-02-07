@@ -1,4 +1,5 @@
 from src.agents import *
+from src.CLUB import CLUB
 from src.environment import ProductEnvironment
 from src.core import Core
 from src.utils import save_heatmap, psi_lin, psi_ctx
@@ -17,7 +18,7 @@ if __name__ == '__main__':
     warnings.filterwarnings('ignore')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--sim_id', type=int, default=0)
+    parser.add_argument('-s', '--sim_id', default=0)
     parser.add_argument('-t', '--test_file', default=None)
     args = parser.parse_args()
 
@@ -72,28 +73,27 @@ if __name__ == '__main__':
 
         # Reward upper bound
         max_reward = clairvoyant_logs.max()
-
         agents_list = [
-            UCB1Agent(param_dict["arms"],
-                      param_dict["context_set"],
-                      max_reward),
-            LinUCBAgent(param_dict["arms"],
-                        param_dict["context_set"],
-                        param_dict["horizon"],
-                        1,
-                        param_dict["max_theta_norm_sum"],
-                        param_dict["max_arm_norm"],
-                        param_dict['sigma']),
-            INDUCB1Agent(param_dict["arms"],
-                         param_dict["context_set"],
-                         max_reward),
-            INDLinUCBAgent(param_dict["arms"],
-                           param_dict["context_set"],
-                           param_dict["horizon"],
-                           1,
-                           param_dict["max_theta_norm_sum"],
-                           param_dict["max_arm_norm"],
-                           param_dict['sigma']),
+            # UCB1Agent(param_dict["arms"],
+            #           param_dict["context_set"],
+            #           max_reward),
+            # LinUCBAgent(param_dict["arms"],
+            #             param_dict["context_set"],
+            #             param_dict["horizon"],
+            #             1,
+            #             param_dict["max_theta_norm_sum"],
+            #             param_dict["max_arm_norm"],
+            #             param_dict['sigma']),
+            # INDUCB1Agent(param_dict["arms"],
+            #              param_dict["context_set"],
+            #              max_reward),
+            # INDLinUCBAgent(param_dict["arms"],
+            #                param_dict["context_set"],
+            #                param_dict["horizon"],
+            #                1,
+            #                param_dict["max_theta_norm_sum"],
+            #                param_dict["max_arm_norm"],
+            #                param_dict['sigma']),
             ProductLinearAgent(param_dict["arms"],
                                param_dict["context_set"],
                                param_dict["horizon"],
@@ -102,6 +102,14 @@ if __name__ == '__main__':
                                param_dict["max_theta_norm_p"],
                                param_dict["max_arm_norm"],
                                param_dict['sigma']),
+            CLUB(param_dict["arms"],
+                 param_dict["context_set"],
+                 param_dict["horizon"],
+                 #  1,
+                 #  param_dict["max_theta_norm_sum"],
+                 #  param_dict["max_arm_norm"],
+                 #  param_dict['sigma']
+                 ),
             # ContextualLinUCBAgent(param_dict["arms"],
             #                       param_dict["context_set"],
             #                       psi_ctx,
