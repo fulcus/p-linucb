@@ -13,6 +13,20 @@ class Cluster:
         self.M_inv = np.linalg.inv(self.M)
         self.theta = np.matmul(self.M_inv, self.b)
 
+    def pull_arm(self, arms, t):
+        return np.argmax(np.dot(arms, self.theta) + self._beta(arms.shape[1], t) * (np.matmul(arms, self.M_inv) * arms).sum(axis=1))
+
+    def _beta(self, d, t):
+        return np.sqrt(d * np.log(1 + self.N / d) + 4 * np.log(t) + np.log(2)) + 1
+
+    def update(self, a, y):
+        self.M += np.outer(a, a)
+        self.b += y * a
+        self.N += 1
+
+        self.M_inv = np.linalg.inv(self.M)
+        self.theta = np.matmul(self.M_inv, self.b)
+
 
 class CLUB(Agent):
     # random_init: use random initialization or not
@@ -27,7 +41,8 @@ class CLUB(Agent):
         self.M = {i: np.eye(self.arm_dim) for i in range(self.n_contexts)}
         self.b = {i: np.zeros(self.arm_dim) for i in range(self.n_contexts)}
         self.M_inv = {i: np.eye(self.arm_dim) for i in range(self.n_contexts)}
-        self.theta = {i: np.zeros(self.arm_dim) for i in range(self.n_contexts)}
+        self.theta = {i: np.zeros(self.arm_dim)
+                      for i in range(self.n_contexts)}
         self.num_pulls = np.zeros(self.n_contexts)  # users array
 
         # CLUB
@@ -42,57 +57,34 @@ class CLUB(Agent):
         self.num_clusters = np.zeros(horizon)
 
     def pull_arm(self, context_i):
-        """
-        i: user index (context_i)
-        items: (num_items, d) items to choose from (arms)
-        """
         # get cluster of user i
         cluster_i = self.cluster_inds[context_i]
         cluster = self.clusters[cluster_i]
-        self.last_pull_i = self._select_item_ucb(
-            cluster.M_inv, cluster.theta, self.arms, cluster.N, self.t)
+        self.last_pull_i = cluster.pull_arm(self.arms, self.t)
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
-    def _select_item_ucb(self, M_inv, theta, items, N, t):
-        return np.argmax(np.dot(items, theta) + self._beta(N, t) * (np.matmul(items, M_inv) * items).sum(axis=1))
-
-    def _beta(self, N, t):
-        return np.sqrt(self.arm_dim * np.log(1 + N / self.arm_dim) + 4 * np.log(t) + np.log(2)) + 1
+    def update_arms(self, rewards):
+        for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
+            # update weights
+            self.update(i=c_i, a=self.arms[arm_i], y=reward)
+        self.update_clustering(self.t)
+        self.t += 1
 
     def update(self, i, a, y):
         # INDLinUCB
         self.M[i] += np.outer(a, a)
         self.b[i] += y * a
         self.num_pulls[i] += 1
-        self.M_inv[i], self.theta[i] = self._update_inverse(
-            self.M[i], self.b[i], self.M_inv[i], a, self.num_pulls[i])
-
+        self.M_inv[i] = np.linalg.inv(self.M[i])
+        self.theta[i] = np.matmul(self.M_inv[i], self.b[i])
         # CLUB
-        c = self.cluster_inds[i]
-        self.clusters[c].M += np.outer(a, a)
-        self.clusters[c].b += y * a
-        self.clusters[c].N += 1
+        cluster_i = self.cluster_inds[i]
+        cluster = self.clusters[cluster_i]
+        cluster.update(a, y)
 
-        self.clusters[c].M_inv, self.clusters[c].theta = self._update_inverse(
-            self.clusters[c].M, self.clusters[c].b, self.clusters[c].M_inv, a, self.clusters[c].N)
-
-    def _update_inverse(self, M, b, M_inv, x, t):
-        M_inv = np.linalg.inv(M)
-        theta = np.matmul(M_inv, b)
-        return M_inv, theta
-
-    def _if_split(self, theta, N1, N2):
-        # alpha = 2 * np.sqrt(2 * self.d)
-        alpha = 1
-
-        def _factT(T):
-            return np.sqrt((1 + np.log(1 + T)) / (1 + T))
-        return np.linalg.norm(theta) > alpha * (_factT(N1) + _factT(N2))
-
-    def update_cluster(self, t):
+    def update_clustering(self, t):
         update_clusters = False
-
         # delete edges
         for i in self.context_indexes:
             cluster_i = self.cluster_inds[i]
@@ -104,7 +96,7 @@ class CLUB(Agent):
                     update_clusters = True
 
         if update_clusters:
-            C = set() # contexts
+            C = set()  # contexts
             for i in self.context_indexes:  # suppose there is only one user per round
                 C = nx.node_connected_component(self.G, i)
                 cluster_i = self.cluster_inds[i]
@@ -129,36 +121,10 @@ class CLUB(Agent):
             print(len(self.clusters))
         self.num_clusters[t] = len(self.clusters)
 
-        # if t % 1000 == 0:
-        #     print(self.cluster_inds)
-        #     print([np.linalg.norm(self.theta[0]-self.theta[i]) for i in range(1,self.nu)])
+    def _if_split(self, theta, N1, N2):
+        # alpha = 2 * np.sqrt(2 * self.d)
+        alpha = 1
 
-    def update_arms(self, rewards):
-        for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
-            # update weights
-            self.update(i=c_i, a=self.arms[arm_i], y=reward)
-        self.update_cluster(self.t)
-        self.t += 1
-
-
-"""
-    def run(self, envir):
-        for t in range(self.T):
-            if t % 5000 == 0:
-                print(t // 5000, end=' ')
-            self.I = envir.generate_users()
-            # main diff: recommend for each user i
-            for i in self.I:
-                # context_indexes = environment.get_contexts()
-                items = envir.get_items()
-                # actions = agent.pull_arms(context_indexes)
-                # actually: only best action for current external ctx
-                kk = self.pull_arm(context_i=i, items=items, t=t)
-                x = items[kk]
-                # rewards = environment.round_all(actions)
-                y, r, br = envir.feedback(i=i, k=kk)
-                # agent.update_arms(rewards)
-                self.update_weights(i=i, x=x, y=y, t=t, r=r, br=br)
-
-            self.update(t)
-"""
+        def _factT(T):
+            return np.sqrt((1 + np.log(1 + T)) / (1 + T))
+        return np.linalg.norm(theta) > alpha * (_factT(N1) + _factT(N2))
