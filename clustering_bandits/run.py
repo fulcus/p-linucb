@@ -1,8 +1,8 @@
 from src.agents import *
 from src.CLUB import CLUB
-from src.environment import ProductEnvironment
+from src.environment import ProductEnvironment, ProductEnvironmentMixed
 from src.core import Core
-from src.utils import save_heatmap, psi_lin, psi_ctx
+from src.utils import save_heatmap, psi_lin, psi_hadamard, psi_cartesian
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
@@ -42,27 +42,27 @@ if __name__ == '__main__':
             if type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
 
-        save_heatmap(out_dir + 'png/' + testcase + '_heat',
-                     param_dict["arms"], param_dict["context_set"],
-                     param_dict["theta"], param_dict["theta_p"])
+        # save_heatmap(out_dir + 'png/' + testcase + '_heat',
+        #              param_dict["arms"], param_dict["context_set"],
+        #              param_dict["theta"], param_dict["theta_p"])
 
         logs = {}
         a_hists = {}
-
-        env = ProductEnvironment(n_rounds=param_dict["horizon"],
-                                 arms=param_dict["arms"],
-                                 context_set=param_dict["context_set"],
-                                 theta=param_dict["theta"],
-                                 theta_p=param_dict["theta_p"],
-                                 psi=psi_lin,
-                                 sigma=param_dict['sigma'],
-                                 random_state=param_dict['seed'])
-
+        
+        psi = psi_cartesian
+        env = ProductEnvironmentMixed(n_rounds=param_dict["horizon"],
+                                      arms=param_dict["arms"],
+                                      context_set=param_dict["context_set"],
+                                      theta=param_dict["theta"],
+                                      theta_p=param_dict["theta_p"],
+                                      psi=psi,
+                                      sigma=param_dict['sigma'],
+                                      random_state=param_dict['seed'])
         # Clairvoyant
         agent = Clairvoyant(arms=param_dict["arms"],
                             context_set=param_dict["context_set"],
                             theta=param_dict["theta"],
-                            psi=psi_lin,
+                            psi=psi,
                             theta_p=param_dict["theta_p"])
         core = Core(env, agent)
         # rewards, arms
@@ -70,30 +70,30 @@ if __name__ == '__main__':
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         print(f"Clairvoyant - {time.time() - start_time:.2f}s")
         start_time = time.time()
-
         # Reward upper bound
         max_reward = clairvoyant_logs.max()
+
         agents_list = [
             # UCB1Agent(param_dict["arms"],
             #           param_dict["context_set"],
             #           max_reward),
-            # LinUCBAgent(param_dict["arms"],
-            #             param_dict["context_set"],
-            #             param_dict["horizon"],
-            #             1,
-            #             param_dict["max_theta_norm_sum"],
-            #             param_dict["max_arm_norm"],
-            #             param_dict['sigma']),
+            LinUCBAgent(param_dict["arms"],
+                        param_dict["context_set"],
+                        param_dict["horizon"],
+                        1,
+                        param_dict["max_theta_norm_sum"],
+                        param_dict["max_arm_norm"],
+                        param_dict['sigma']),
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["context_set"],
             #              max_reward),
-            # INDLinUCBAgent(param_dict["arms"],
-            #                param_dict["context_set"],
-            #                param_dict["horizon"],
-            #                1,
-            #                param_dict["max_theta_norm_sum"],
-            #                param_dict["max_arm_norm"],
-            #                param_dict['sigma']),
+            INDLinUCBAgent(param_dict["arms"],
+                           param_dict["context_set"],
+                           param_dict["horizon"],
+                           1,
+                           param_dict["max_theta_norm_sum"],
+                           param_dict["max_arm_norm"],
+                           param_dict['sigma']),
             # ProductLinearAgent(param_dict["arms"],
             #                    param_dict["context_set"],
             #                    param_dict["horizon"],
@@ -102,26 +102,38 @@ if __name__ == '__main__':
             #                    param_dict["max_theta_norm_p"],
             #                    param_dict["max_arm_norm"],
             #                    param_dict['sigma']),
-            CLUB(param_dict["arms"],
-                 param_dict["context_set"],
-                 param_dict["horizon"]),
+            # CLUB(param_dict["arms"],
+            #      param_dict["context_set"],
+            #      param_dict["horizon"]),
             # ContextualLinUCBAgent(param_dict["arms"],
             #                       param_dict["context_set"],
-            #                       psi_ctx,
+            #                       psi,
+            #                       param_dict["psi_dim"],
             #                       param_dict["horizon"],
             #                       1,
             #                       param_dict["max_theta_norm_sum"],
             #                       param_dict["max_arm_norm"],
             #                       param_dict['sigma']),
-            # ProductContextualAgent(param_dict["arms"],
-            #                        param_dict["context_set"],
-            #                        psi_ctx,
-            #                        param_dict["horizon"],
-            #                        1,
-            #                        param_dict["max_theta_norm_shared"],
-            #                        param_dict["max_theta_norm_p"],
-            #                        param_dict["max_arm_norm"],
-            #                        param_dict['sigma']),
+            ProductContextualAgent(param_dict["arms"],
+                                   param_dict["context_set"],
+                                   psi,
+                                   param_dict["psi_dim"],
+                                   param_dict["horizon"],
+                                   1,
+                                   param_dict["max_theta_norm_shared"],
+                                   param_dict["max_theta_norm_p"],
+                                   param_dict["max_arm_norm"],
+                                   param_dict['sigma']),
+            ProductMixedAgent(param_dict["arms"],
+                                   param_dict["context_set"],
+                                   psi,
+                                   param_dict["psi_dim"],
+                                   param_dict["horizon"],
+                                   1,
+                                   param_dict["max_theta_norm_shared"],
+                                   param_dict["max_theta_norm_p"],
+                                   param_dict["max_arm_norm"],
+                                   param_dict['sigma'])
         ]
 
         # Train all agents

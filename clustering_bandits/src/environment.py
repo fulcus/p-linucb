@@ -5,6 +5,7 @@ class ContextualLinearEnvironment:
     """exp_reward = theta * psi(arm, context)"""
 
     def __init__(self, n_rounds, arms, theta, context_set, psi, sigma=0.01, random_state=1):
+        # assert context_set.shape[1] == arms.shape[1]
         self.n_rounds = n_rounds
         self.arms = arms
         self.theta = theta
@@ -23,8 +24,6 @@ class ContextualLinearEnvironment:
         """computes reward for each context, action pair
         pulled_arms_i: row i contains arm j pulled for context i
         """
-        assert self.context_set.shape[1] == self.arms.shape[1]
-
         obs_reward = np.zeros((self.n_contexts,))
         for x_i, a_j in enumerate(pulled_arms_i):
             obs_reward[x_i] = self.round(a_j, x_i)
@@ -60,6 +59,22 @@ class ProductEnvironment(ContextualLinearEnvironment):
     def round(self, arm_i, x_i):
         psi = self.psi(self.arms[arm_i], self.context_set[x_i])
         obs_reward = (self.theta @ psi
+                      + self.theta_p[x_i] @ psi
+                      + self.noise[self.t])
+        return obs_reward
+
+
+class ProductEnvironmentMixed(ContextualLinearEnvironment):
+    """exp_reward = theta * arm + theta_p[context] * psi(arm, context)"""
+
+    def __init__(self, n_rounds, arms, theta, context_set, theta_p, psi, sigma=0.01, random_state=1):
+        self.theta_p = theta_p
+        super().__init__(n_rounds, arms, theta, context_set, psi, sigma, random_state)
+
+    def round(self, arm_i, x_i):
+        arm = self.arms[arm_i]
+        psi = self.psi(arm, self.context_set[x_i])
+        obs_reward = (self.theta @ arm
                       + self.theta_p[x_i] @ psi
                       + self.noise[self.t])
         return obs_reward

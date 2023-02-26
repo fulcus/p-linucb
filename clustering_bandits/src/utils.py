@@ -23,5 +23,8 @@ def psi_lin(a, x):
     return a
 
 
-def psi_ctx(a, x):
+def psi_hadamard(a, x):
     return np.multiply(a, x)
+
+def psi_cartesian(a, x):
+    return np.outer(a, x).reshape(-1)

@@ -5,7 +5,7 @@ from src.utils import psi_lin
 
 class Agent(ABC):
     def __init__(self, arms, context_set):
-        assert context_set.shape[1] == arms.shape[1]
+        #  assert context_set.shape[1] == arms.shape[1]
         self.arms = arms
         self.context_set = context_set
         self.n_contexts = context_set.shape[0]
@@ -49,7 +49,7 @@ class Clairvoyant(Agent):
         context = self.context_set[context_i]
         for i, arm in enumerate(self.arms):
             psi = self.psi(arm, context)
-            exp_rewards[i] = (self.theta @ psi
+            exp_rewards[i] = (self.theta @ arm
                               + self.theta_p[context_i] @ psi)
         self.last_pull_i = np.argmax(exp_rewards)
         self.a_hist.append(self.last_pull_i)
@@ -105,6 +105,7 @@ class LinUCBAgent(Agent):
         self.V_t_inv = np.linalg.inv(self.V_t)
         self.b_vect = np.zeros((self.arm_dim, 1))
         self.theta_hat = np.zeros((self.arm_dim, 1))
+
         self.last_ucb = np.zeros(self.n_arms)
 
     def pull_arm(self, context_i=None):
@@ -119,7 +120,7 @@ class LinUCBAgent(Agent):
         self.n_pulls += 1
         if arm_i is not None:
             self.last_pull_i = arm_i
-        last_pull = self.arms[self.last_pull_i].reshape(self.arm_dim, 1)
+        last_pull = self.arms[self.last_pull_i].reshape(-1, 1)
         self.V_t = self.V_t + (last_pull @ last_pull.T)
         self.b_vect = self.b_vect + last_pull * reward
         self.V_t_inv = np.linalg.inv(self.V_t)
@@ -128,7 +129,7 @@ class LinUCBAgent(Agent):
     def _estimate_linucb_arm(self):
         bound = self._beta_t_fun_linucb()
         for i, arm in enumerate(self.arms):
-            arm = arm.reshape(self.arm_dim, 1)
+            arm = arm.reshape(-1, 1)
             self.last_ucb[i] = (self.theta_hat.T @ arm + bound
                                 * np.sqrt(arm.T @ np.linalg.inv(self.V_t) @ arm))
         return np.argmax(self.last_ucb)
@@ -155,11 +156,16 @@ class LinUCBAgent(Agent):
 
 
 class ContextualLinUCBAgent(LinUCBAgent):
-    def __init__(self, arms, context_set, psi, horizon, lmbd,
+    def __init__(self, arms, context_set, psi, psi_dim, horizon, lmbd,
                  max_theta_norm_sum, max_arm_norm, sigma=1):
         super().__init__(arms, context_set, horizon, lmbd,
                          max_theta_norm_sum, max_arm_norm, sigma)
         self.psi = psi
+        self.psi_dim = psi_dim
+        self.V_t = self.lmbd * np.eye(self.psi_dim)
+        self.V_t_inv = np.linalg.inv(self.V_t)
+        self.b_vect = np.zeros((self.psi_dim, 1))
+        self.theta_hat = np.zeros((self.psi_dim, 1))
 
     def pull_arm(self, context_i):
         if self.first:
@@ -175,7 +181,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
 
         last_psi = self.psi(
             self.arms[self.last_pull_i], self.context_set[context_i])
-        last_psi = last_psi.reshape(self.arm_dim, 1)
+        last_psi = last_psi.reshape(-1, 1)
         self.V_t = self.V_t + (last_psi @ last_psi.T)
         self.b_vect = self.b_vect + last_psi * reward
         self.theta_hat = np.linalg.inv(self.V_t) @ self.b_vect
@@ -184,7 +190,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
         bound = self._beta_t_fun_linucb()
         for i, arm in enumerate(self.arms):
             psi = self.psi(arm, self.context_set[context_i])
-            psi = psi.reshape(self.arm_dim, 1)
+            psi = psi.reshape(-1, 1)
             self.last_ucb[i] = (self.theta_hat.T @ psi + bound
                                 * np.sqrt(psi.T @ np.linalg.inv(self.V_t) @ psi))
         return np.argmax(self.last_ucb)
@@ -256,7 +262,7 @@ class ProductContextualAgent(Agent):
     """Combines a global contextual linear bandit
     and an independent linear bandit per context"""
 
-    def __init__(self, arms, context_set, psi, horizon, lmbd, max_theta_norm_shared,
+    def __init__(self, arms, context_set, psi, psi_dim, horizon, lmbd, max_theta_norm_shared,
                  max_theta_norm_p, max_arm_norm, sigma):
         super().__init__(arms, context_set)
         self.lmbd = lmbd
@@ -266,12 +272,13 @@ class ProductContextualAgent(Agent):
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
         self.psi = psi
+        self.psi_dim = psi_dim
 
         self.first = True
         self.first_context_set = set([i for i in range(self.n_contexts)])
 
         self.agent_global = ContextualLinUCBAgent(
-            self.arms, self.context_set, self.psi, self.horizon, self.lmbd,
+            self.arms, self.context_set, self.psi, self.psi_dim, self.horizon, self.lmbd,
             self.max_theta_norm_shared, self.max_arm_norm)
         self.context_agent = [
             LinUCBAgent(
@@ -283,7 +290,6 @@ class ProductContextualAgent(Agent):
 
     def pull_arm(self, context_i):
         """arm = argmax (theta * arm + theta_p * arm)"""
-        # self.agent_global.last_context = self.context_set[context_i]
 
         if context_i in self.first_context_set:
             self.last_pull_i, first = \
@@ -293,7 +299,7 @@ class ProductContextualAgent(Agent):
         else:
             # compute and combine their ucb
             self.agent_global.pull_arm(context_i)
-            self.context_agent[context_i].pull_arm()
+            self.context_agent[context_i].pull_arm(context_i)
 
             ucb = self.agent_global.last_ucb + \
                 self.context_agent[context_i].last_ucb
@@ -305,13 +311,12 @@ class ProductContextualAgent(Agent):
     def update(self, reward, arm_i=None, context_i=None):
         if arm_i is not None:
             self.last_pull_i = arm_i
-        self.agent_global.update(reward, arm_i=self.last_pull_i)
+        self.agent_global.update(reward, self.last_pull_i, context_i)
         psi = self.psi(self.arms[self.agent_global.last_pull_i],
                        self.context_set[context_i])
         pred_reward = self.agent_global.theta_hat.T @ psi
         residual = reward - pred_reward
-        self.context_agent[context_i].update(
-            residual, arm_i=self.last_pull_i)
+        self.context_agent[context_i].update(residual, self.last_pull_i)
 
 
 class ProductLinearAgent(ProductContextualAgent):
@@ -325,3 +330,36 @@ class ProductLinearAgent(ProductContextualAgent):
         super().__init__(arms, context_set, psi, horizon, lmbd,
                          max_theta_norm_shared, max_theta_norm_p,
                          max_arm_norm, sigma)
+
+
+class ProductMixedAgent(ProductContextualAgent):
+    """Combines a global linear bandit
+    and an independent contextual bandit per context"""
+
+    def __init__(self, arms, context_set, psi, psi_dim, horizon, lmbd,
+                 max_theta_norm_shared, max_theta_norm_p, max_arm_norm, sigma):
+        super().__init__(arms, context_set, psi, psi_dim, horizon, lmbd,
+                         max_theta_norm_shared, max_theta_norm_p,
+                         max_arm_norm, sigma)
+        self.agent_global = LinUCBAgent(
+            self.arms, self.context_set, self.horizon,
+            self.lmbd, self.max_theta_norm_shared,
+            self.max_arm_norm)
+        # TODO fix max arm norm with max phi norm in contextual
+        self.context_agent = [
+            ContextualLinUCBAgent(
+                self.arms, self.context_set, self.psi, self.psi_dim,
+                self.horizon, self.lmbd, self.max_theta_norm_p,
+                self.max_arm_norm)
+            for _ in range(self.n_contexts)
+        ]
+
+    def update(self, reward, arm_i=None, context_i=None):
+        if arm_i is not None:
+            self.last_pull_i = arm_i
+        self.agent_global.update(reward, self.last_pull_i)
+        arm = self.arms[self.agent_global.last_pull_i]
+        pred_reward = self.agent_global.theta_hat.T @ arm
+        residual = reward - pred_reward
+        self.context_agent[context_i].update(
+            residual, self.last_pull_i, context_i)
