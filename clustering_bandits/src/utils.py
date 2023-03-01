@@ -2,6 +2,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn.metrics import mean_squared_error
+
+
+def psi_lin(a, x):
+    return a
+
+
+def psi_hadamard(a, x):
+    return np.multiply(a, x)
+
+
+def psi_cartesian(a, x):
+    return np.outer(a, x).reshape(-1)
 
 
 def save_heatmap(fpath, arms, context_set, theta, theta_p):
@@ -17,14 +30,3 @@ def save_heatmap(fpath, arms, context_set, theta, theta_p):
     # plt.show()
     # df.to_csv(out_dir + 'table.csv')
     # exit(0)
-
-
-def psi_lin(a, x):
-    return a
-
-
-def psi_hadamard(a, x):
-    return np.multiply(a, x)
-
-def psi_cartesian(a, x):
-    return np.outer(a, x).reshape(-1)

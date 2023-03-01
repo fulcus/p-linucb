@@ -33,7 +33,8 @@ if __name__ == '__main__':
     n_contexts = 10
     arm_dim = 4
     ctx_dim = 3
-    psi_dim = arm_dim * ctx_dim
+    # psi_dim = arm_dim * ctx_dim
+    psi_dim = 2
 
     if args.arm == 'v':
         arm_coord_norm = 1
@@ -46,14 +47,15 @@ if __name__ == '__main__':
         n_arms = 5
         arms = random_arms(n_arms, arm_dim, args.seed)
 
-    # max global norm: np.linalg.norm([1, 1, 1, 1]) == 2
-    # max local norm: np.linalg.norm(np.outer([1, 1, 1, 1], [1, 1, 1])) < 3.5
-    max_arm_norm = math.ceil(np.linalg.norm(np.outer([1, 1, 1, 1], [1, 1, 1])))
     
-    # max_arm_norm = math.ceil(np.max([np.linalg.norm(a) for a in arms]))
+    # max local norm < 3.5
+    # max_arm_norm = math.ceil(np.linalg.norm(np.outer([1, 1, 1, 1], [1, 1, 1])))
+    # max global norm == 2 == np.linalg.norm([1, 1, 1, 1])
+    
+    max_arm_norm = math.ceil(np.max([np.linalg.norm(a) for a in arms]))
 
     np.random.seed(args.seed)
-    theta = np.random.uniform(-3.0, 3.0, size=(1, arm_dim)).round(2).tolist()
+    theta = np.random.uniform(-3.0, 3.0, size=(1, psi_dim)).round(2).tolist()
     np.random.seed(args.seed)
     theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, psi_dim))
     theta_p = theta_p.round(2).tolist()
@@ -68,9 +70,9 @@ if __name__ == '__main__':
     context_set = context_set.round(2).tolist()
 
     params = {
-        "horizon": 10000,
-        "n_epochs": 10,
-        "sigma": 0.00001,
+        "horizon": 5000,
+        "n_epochs": 1,
+        "sigma": 0.1,
         "seed": args.seed,
         "n_arms": n_arms,
         "psi_dim": psi_dim,

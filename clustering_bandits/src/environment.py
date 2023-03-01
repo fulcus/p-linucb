@@ -4,7 +4,7 @@ import numpy as np
 class ContextualLinearEnvironment:
     """exp_reward = theta * psi(arm, context)"""
 
-    def __init__(self, n_rounds, arms, theta, context_set, psi, sigma=0.01, random_state=1):
+    def __init__(self, n_rounds, arms, context_set, theta, psi, sigma=0.01, random_state=1):
         # assert context_set.shape[1] == arms.shape[1]
         self.n_rounds = n_rounds
         self.arms = arms
@@ -52,9 +52,9 @@ class ContextualLinearEnvironment:
 class ProductEnvironment(ContextualLinearEnvironment):
     """exp_reward = theta * psi(arm, context) + theta_p[context] * psi(arm, context)"""
 
-    def __init__(self, n_rounds, arms, theta, context_set, theta_p, psi, sigma=0.01, random_state=1):
+    def __init__(self, n_rounds, arms, context_set, theta, theta_p, psi, sigma=0.01, random_state=1):
         self.theta_p = theta_p
-        super().__init__(n_rounds, arms, theta, context_set, psi, sigma, random_state)
+        super().__init__(n_rounds, arms, context_set, theta, psi, sigma, random_state)
 
     def round(self, arm_i, x_i):
         psi = self.psi(self.arms[arm_i], self.context_set[x_i])
@@ -64,17 +64,33 @@ class ProductEnvironment(ContextualLinearEnvironment):
         return obs_reward
 
 
-class ProductEnvironmentMixed(ContextualLinearEnvironment):
+class ProductMixedEnvironment(ContextualLinearEnvironment):
     """exp_reward = theta * arm + theta_p[context] * psi(arm, context)"""
 
-    def __init__(self, n_rounds, arms, theta, context_set, theta_p, psi, sigma=0.01, random_state=1):
+    def __init__(self, n_rounds, arms, context_set, theta, theta_p, psi, sigma=0.01, random_state=1):
         self.theta_p = theta_p
-        super().__init__(n_rounds, arms, theta, context_set, psi, sigma, random_state)
+        super().__init__(n_rounds, arms, context_set, theta, psi, sigma, random_state)
 
     def round(self, arm_i, x_i):
         arm = self.arms[arm_i]
         psi = self.psi(arm, self.context_set[x_i])
         obs_reward = (self.theta @ arm
                       + self.theta_p[x_i] @ psi
+                      + self.noise[self.t])
+        return obs_reward
+
+
+class PartitionedEnvironment(ContextualLinearEnvironment):
+    """exp_reward = theta * arm[:k] + theta_p[context] * arm[k:]"""
+
+    def __init__(self, n_rounds, arms, context_set, theta, theta_p, psi, k, sigma=0.01, random_state=1):
+        self.theta_p = theta_p
+        self.k = k  # first k global components
+        super().__init__(n_rounds, arms, context_set, theta, psi, sigma, random_state)
+
+    def round(self, arm_i, x_i):
+        arm = self.arms[arm_i]
+        obs_reward = (self.theta @ arm[:self.k]
+                      + self.theta_p[x_i] @ arm[self.k:]
                       + self.noise[self.t])
         return obs_reward
