@@ -115,7 +115,7 @@ class LinUCBAgent(Agent):
 
     def pull_arm(self, context_i=None):
         if self.first:
-            self._pull_round_robin()
+            self.last_pull_i = self._pull_round_robin()
         else:
             self.last_pull_i = self._estimate_linucb_arm()
         self.a_hist.append(self.last_pull_i)
@@ -162,7 +162,7 @@ class LinUCBAgent(Agent):
                 self.first = False
             else:
                 self.last_pull_i += 1
-        return self.last_pull_i, self.first
+        return self.last_pull_i
 
 
 class ContextualLinUCBAgent(LinUCBAgent):
@@ -179,7 +179,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
 
     def pull_arm(self, context_i):
         if self.first:
-            self._pull_round_robin()
+            self.last_pull_i = self._pull_round_robin()
         else:
             self.last_pull_i = self._estimate_linucb_arm(context_i)
         self.a_hist.append(self.last_pull_i)
@@ -303,9 +303,9 @@ class ProductContextualAgent(Agent):
         # TODO think through and remove
         # prob not necessary since it's already done by each individual agent
         if context_i in self.first_context_set:
-            self.last_pull_i, first = \
+            self.last_pull_i = \
                 self.context_agent[context_i]._pull_round_robin()
-            if not first:
+            if not self.context_agent[context_i].first:
                 self.first_context_set.remove(context_i)
         else:
             # compute and combine their ucb
@@ -392,76 +392,53 @@ class PartitionedAgent(INDLinUCBAgent):
         self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
 
         self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
+        self.arms_local = np.unique(
+            np.delete(self.arms, np.s_[:self.k], axis=1), axis=0)
         self.max_arm_norm_local = np.max(
             [np.linalg.norm(a) for a in self.arms_local])
-        #  TODO reduce theta and arm norm after split
-        """
-        self.context_agent = [
-            LinUCBAgent(
-                self.arms,
-                self.context_set,
-                self.horizon,
-                self.lmbd,
-                self.max_theta_norm_sum,
-                self.max_arm_norm,
-                self.sigma)
-            for _ in range(self.n_contexts)
-        ]
-
-        self.V_t = self.lmbd * np.eye(self.arm_dim)
-        self.V_t_inv = np.linalg.inv(self.V_t)
-        self.b_vect = np.zeros((self.arm_dim, 1))
-        self.theta_hat = np.zeros((self.arm_dim, 1))
-
-        self.reward_hist = np.array([])
-        self.theta_hat_hist = np.array([])
-        self.mse_hist = np.array([])
-        """
 
     def pull_arm(self, context_i):
         """arm = argmax (theta * arm[:k] + theta_p[context] * arm[k:])"""
         arm_i = self.context_agent[context_i].pull_arm()
         # if split has happened arm_i is index of second half
-        # TODO problem: after split there might be duplicate local arms
         if self.subarm_global is not None:
             subarm_local = self.arms_local[arm_i]
             arm = np.concatenate([self.subarm_global, subarm_local])
             arm_i = self.arm_index[tuple(arm)]
-
         self.a_hist.append(arm_i)
         return arm_i
 
-    def update(self, reward, arm_i=None, context_i=None):
-        if arm_i is not None:  #  always true?
-            self.last_pull_i = arm_i
-        arm = self.arms[self.last_pull_i]
+    def update_arms(self, rewards):
+        arm_leader = c_i_leader = None
+        for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
+            if self.subtheta_global is None:
+                pred_reward = self.context_agent[c_i].theta_hat.T @ self.arms[arm_i]
+                # error below threshold
+                if (reward - pred_reward) ** 2 <= self.err_th:
+                    arm_leader, c_i_leader = self.arms[arm_i], c_i
+            else:
+                # remove global arm contribution to update local arm
+                reward -= self.subtheta_global.T @ self.arms_global[self.last_pull_i]
+            self.update(reward, arm_i=arm_i, context_i=c_i)
 
-        # no leader yet
-        if self.subtheta_global is None:
-            pred_reward = self.context_agent[context_i].theta_hat.T @ arm
-            # error below threshold
-            if (reward - pred_reward) ** 2 <= self.err_th:
-                self.subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
-                self.subarm_global = arm[:self.k]
-                for agent in self.context_agent:
-                    # remove global components from all agents
-                    agent.arm_dim -= self.k
-                    agent.max_arm_norm = self.max_arm_norm_local
-                    agent.arms = self.arms_local
-                    # removing global components contributions
-                    y_loc = agent.reward_hist - \
-                        self.subtheta_global.T @ self.arms_global[agent.a_hist]
-                    A_loc = self.arms_local[agent.a_hist]
-                    # recompute bandit parameters
-                    agent.V_t = A_loc.T @ A_loc + \
-                        agent.lmbd * np.eye(agent.arm_dim)
-                    agent.b_vect = A_loc.T @ y_loc.T
-                reward = reward - \
-                    self.subtheta_global.T @ self.arms_global[self.last_pull_i]
-        else:
-            reward = reward - \
-                self.subtheta_global.T @ self.arms_global[self.last_pull_i]
+        # recompute params at the end of round
+        if self.subtheta_global is not None:
+            self._split_agents_params(arm_leader, c_i_leader)
+        self.t += 1
 
-        self.context_agent[context_i].update(
-            reward, self.last_pull_i, context_i)
+    def _split_agents_params(self, arm, context_i):
+        self.subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
+        self.subarm_global = arm[:self.k]
+        for i, agent in enumerate(self.context_agent):
+            # remove global components from all agents
+            agent.arm_dim -= self.k
+            agent.max_arm_norm = self.max_arm_norm_local
+            agent.arms = self.arms_local
+            # removing global components contributions
+            y_loc = agent.reward_hist.T - \
+                self.subtheta_global.T @ self.arms_global[agent.a_hist].T
+            A_loc = self.arms_local[agent.a_hist]
+            # recompute bandit parameters
+            agent.V_t = A_loc.T @ A_loc + \
+                agent.lmbd * np.eye(agent.arm_dim)
+            agent.b_vect = A_loc.T @ y_loc.T
