@@ -389,11 +389,13 @@ class PartitionedAgent(INDLinUCBAgent):
         self.err_th = err_th
         self.subtheta_global = None
         self.subarm_global = None
+        self.t_split = None
         self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
 
         self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        self.arms_local = np.unique(
-            np.delete(self.arms, np.s_[:self.k], axis=1), axis=0)
+        # self.arms_local = np.unique(
+        #     np.delete(self.arms, np.s_[:self.k], axis=1), axis=0)
+        self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
         self.max_arm_norm_local = np.max(
             [np.linalg.norm(a) for a in self.arms_local])
 
@@ -422,14 +424,16 @@ class PartitionedAgent(INDLinUCBAgent):
             self.update(reward, arm_i=arm_i, context_i=c_i)
 
         # recompute params at the end of round
-        if self.subtheta_global is not None:
+        if arm_leader is not None:
+            self.t_split = self.t
             self._split_agents_params(arm_leader, c_i_leader)
         self.t += 1
 
     def _split_agents_params(self, arm, context_i):
+        print(f"{self.t_split=}\n{self.context_agent[context_i].theta_hat=}\n{context_i=}")
         self.subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
         self.subarm_global = arm[:self.k]
-        for i, agent in enumerate(self.context_agent):
+        for agent in self.context_agent:
             # remove global components from all agents
             agent.arm_dim -= self.k
             agent.max_arm_norm = self.max_arm_norm_local
@@ -442,3 +446,5 @@ class PartitionedAgent(INDLinUCBAgent):
             agent.V_t = A_loc.T @ A_loc + \
                 agent.lmbd * np.eye(agent.arm_dim)
             agent.b_vect = A_loc.T @ y_loc.T
+            agent.V_t_inv = np.linalg.inv(agent.V_t)
+            agent.theta_hat = agent.V_t_inv @ agent.b_vect

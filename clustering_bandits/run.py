@@ -48,6 +48,7 @@ if __name__ == '__main__':
 
         logs = {}
         a_hists = {}
+        t_splits = None
 
         psi = psi_cartesian
         env = PartitionedEnvironment(n_rounds=param_dict["horizon"],
@@ -60,15 +61,6 @@ if __name__ == '__main__':
                                      sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
 
-        # env = ProductMixedEnvironment(n_rounds=param_dict["horizon"],
-        #                               arms=param_dict["arms"],
-        #                               context_set=param_dict["context_set"],
-        #                               theta=param_dict["theta"],
-        #                               theta_p=param_dict["theta_p"],
-        #                               psi=psi,
-        #                               sigma=param_dict['sigma'],
-        #                               random_state=param_dict['seed'])
-
         # Clairvoyant
         agent = Clairvoyant(arms=param_dict["arms"],
                             context_set=param_dict["context_set"],
@@ -78,7 +70,7 @@ if __name__ == '__main__':
                             psi=psi)
         core = Core(env, agent)
         # rewards, arms
-        clairvoyant_logs, a_hists['Clairvoyant'] = core.simulation(
+        clairvoyant_logs, a_hists['Clairvoyant'], _ = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         print(f"Clairvoyant - {time.time() - start_time:.2f}s")
         start_time = time.time()
@@ -89,13 +81,13 @@ if __name__ == '__main__':
             # UCB1Agent(param_dict["arms"],
             #           param_dict["context_set"],
             #           max_reward),
-            LinUCBAgent(param_dict["arms"],
-                        param_dict["context_set"],
-                        param_dict["horizon"],
-                        1,
-                        param_dict["max_theta_norm_sum"],
-                        param_dict["max_arm_norm"],
-                        param_dict['sigma']),
+            # LinUCBAgent(param_dict["arms"],
+            #             param_dict["context_set"],
+            #             param_dict["horizon"],
+            #             1,
+            #             param_dict["max_theta_norm_sum"],
+            #             param_dict["max_arm_norm"],
+            #             param_dict['sigma']),
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["context_set"],
             #              max_reward),
@@ -113,7 +105,7 @@ if __name__ == '__main__':
                              param_dict["max_theta_norm_sum"],
                              param_dict["max_arm_norm"],
                              k=param_dict["psi_dim"],
-                             err_th=0.5,
+                             err_th=1e-7,
                              sigma=param_dict['sigma'])
             # ProductLinearAgent(param_dict["arms"],
             #                    param_dict["context_set"],
@@ -161,7 +153,7 @@ if __name__ == '__main__':
         for agent in agents_list:
             agent_name = agent.__class__.__name__
             core = Core(env, agent)
-            logs[agent_name], a_hists[agent_name] = core.simulation(
+            logs[agent_name], a_hists[agent_name], t_splits = core.simulation(
                 n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
             print(f"{agent_name} - {time.time() - start_time:.2f}s")
             start_time = time.time()
@@ -231,6 +223,8 @@ if __name__ == '__main__':
                             np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+1}')
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
+        if t_splits:
+            ax.axvline(x = t_splits[0], color = 'b', label = 'split time')
         ax.set_title('Cumulative Regret')
         ax.legend()
 
