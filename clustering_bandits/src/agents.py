@@ -100,22 +100,19 @@ class LinUCBAgent(Agent):
         self.sigma = sigma
 
         self.last_pull_i = 0
-        self.first = True
-        self.arm_pull_count = {a_i: self.arm_dim for a_i in range(self.n_arms)}
-
         self.V_t = self.lmbd * np.eye(self.arm_dim)
         self.V_t_inv = np.linalg.inv(self.V_t)
         self.b_vect = np.zeros((self.arm_dim, 1))
         self.theta_hat = np.zeros((self.arm_dim, 1))
 
         self.last_ucb = np.zeros(self.n_arms)
-        self.reward_hist = np.array([])
-        self.theta_hat_hist = np.array([])
-        self.mse_hist = np.array([])
+        self.reward_hist = []
+        self.theta_hat_hist = []
+        self.mse_hist = []
 
     def pull_arm(self, context_i=None):
-        if self.first:
-            self.last_pull_i = self._pull_round_robin()
+        if len(self.a_hist) < self.arm_dim:
+            self.last_pull_i = len(self.a_hist) % self.n_arms
         else:
             self.last_pull_i = self._estimate_linucb_arm()
         self.a_hist.append(self.last_pull_i)
@@ -131,10 +128,9 @@ class LinUCBAgent(Agent):
         self.V_t_inv = np.linalg.inv(self.V_t)
         self.theta_hat = self.V_t_inv @ self.b_vect
         # update hist
-        self.reward_hist = np.append(self.reward_hist, reward)
-        self.theta_hat_hist = np.append(self.theta_hat_hist, self.theta_hat)
-        self.mse_hist = np.append(
-            self.mse_hist, reward - self.theta_hat.T @ last_pull)
+        self.reward_hist.append(reward)
+        self.theta_hat_hist.append(self.theta_hat)
+        self.mse_hist.append(reward - self.theta_hat.T @ last_pull)
 
     def _estimate_linucb_arm(self):
         bound = self._beta_t_fun_linucb()
@@ -153,17 +149,6 @@ class LinUCBAgent(Agent):
                     / (self.arm_dim * self.lmbd)
                 ))))
 
-    def _pull_round_robin(self):
-        """pull each arm dim_arm times"""
-        if self.arm_pull_count[self.last_pull_i] > 0:
-            self.arm_pull_count[self.last_pull_i] -= 1
-        else:
-            if self.last_pull_i == self.arm_dim - 1:
-                self.first = False
-            else:
-                self.last_pull_i += 1
-        return self.last_pull_i
-
 
 class ContextualLinUCBAgent(LinUCBAgent):
     def __init__(self, arms, context_set, psi, psi_dim, horizon, lmbd,
@@ -178,8 +163,8 @@ class ContextualLinUCBAgent(LinUCBAgent):
         self.theta_hat = np.zeros((self.psi_dim, 1))
 
     def pull_arm(self, context_i):
-        if self.first:
-            self.last_pull_i = self._pull_round_robin()
+        if len(self.a_hist) < self.arm_dim:
+            self.last_pull_i = len(self.a_hist) % self.n_arms
         else:
             self.last_pull_i = self._estimate_linucb_arm(context_i)
         self.a_hist.append(self.last_pull_i)
@@ -202,6 +187,7 @@ class ContextualLinUCBAgent(LinUCBAgent):
         for i, arm in enumerate(self.arms):
             psi = self.psi(arm, self.context_set[context_i])
             psi = psi.reshape(-1, 1)
+            # TODO fix dim
             self.last_ucb[i] = (self.theta_hat.T @ psi + bound
                                 * np.sqrt(psi.T @ self.V_t_inv @ psi))
         return np.argmax(self.last_ucb)
@@ -422,7 +408,6 @@ class PartitionedAgent(INDLinUCBAgent):
                 # remove global arm contribution to update local arm
                 reward -= self.subtheta_global.T @ self.arms_global[self.last_pull_i]
             self.update(reward, arm_i=arm_i, context_i=c_i)
-
         # recompute params at the end of round
         if arm_leader is not None:
             self.t_split = self.t
@@ -430,7 +415,8 @@ class PartitionedAgent(INDLinUCBAgent):
         self.t += 1
 
     def _split_agents_params(self, arm, context_i):
-        print(f"{self.t_split=}\n{self.context_agent[context_i].theta_hat=}\n{context_i=}")
+        print(
+            f"{self.t_split=}\n{self.context_agent[context_i].theta_hat=}\n{context_i=}")
         self.subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
         self.subarm_global = arm[:self.k]
         for agent in self.context_agent:
@@ -439,7 +425,7 @@ class PartitionedAgent(INDLinUCBAgent):
             agent.max_arm_norm = self.max_arm_norm_local
             agent.arms = self.arms_local
             # removing global components contributions
-            y_loc = agent.reward_hist.T - \
+            y_loc = np.array(agent.reward_hist) - \
                 self.subtheta_global.T @ self.arms_global[agent.a_hist].T
             A_loc = self.arms_local[agent.a_hist]
             # recompute bandit parameters
