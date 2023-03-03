@@ -1,8 +1,8 @@
 from src.agents import *
 from src.CLUB import CLUB
-from src.environment import ProductEnvironment, ProductMixedEnvironment, PartitionedEnvironment
+from src.environment import PartitionedEnvironment
 from src.core import Core
-from src.utils import save_heatmap, psi_lin, psi_hadamard, psi_cartesian
+from src.utils import *
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
@@ -107,46 +107,18 @@ if __name__ == '__main__':
                              k=param_dict["psi_dim"],
                              err_th=1e-7,
                              sigma=param_dict['sigma']),
-            # ProductLinearAgent(param_dict["arms"],
-            #                    param_dict["context_set"],
-            #                    param_dict["horizon"],
-            #                    1,
-            #                    param_dict["max_theta_norm_shared"],
-            #                    param_dict["max_theta_norm_p"],
-            #                    param_dict["max_arm_norm"],
-            #                    param_dict['sigma']),
             CLUB(param_dict["arms"],
                  param_dict["context_set"],
                  param_dict["horizon"]),
-            ContextualLinUCBAgent(param_dict["arms"],
-                                  param_dict["context_set"],
-                                  psi,
-                                  param_dict["psi_dim"],
-                                  param_dict["horizon"],
-                                  1,
-                                  param_dict["max_theta_norm_sum"],
-                                  param_dict["max_arm_norm"],
-                                  param_dict['sigma']),
-            # ProductContextualAgent(param_dict["arms"],
-            #                        param_dict["context_set"],
-            #                        psi,
-            #                        param_dict["psi_dim"],
-            #                        param_dict["horizon"],
-            #                        1,
-            #                        param_dict["max_theta_norm_shared"],
-            #                        param_dict["max_theta_norm_p"],
-            #                        param_dict["max_arm_norm"],
-            #                        param_dict['sigma']),
-            # ProductMixedAgent(param_dict["arms"],
-            #                        param_dict["context_set"],
-            #                        psi,
-            #                        param_dict["psi_dim"],
-            #                        param_dict["horizon"],
-            #                        1,
-            #                        param_dict["max_theta_norm_shared"],
-            #                        param_dict["max_theta_norm_p"],
-            #                        param_dict["max_arm_norm"],
-            #                        param_dict['sigma'])
+            # ContextualLinUCBAgent(param_dict["arms"],
+            #                       param_dict["context_set"],
+            #                       psi,
+            #                       param_dict["psi_dim"],
+            #                       param_dict["horizon"],
+            #                       1,
+            #                       param_dict["max_theta_norm_sum"],
+            #                       param_dict["max_arm_norm"],
+            #                       param_dict['sigma']),
         ]
 
         # Train all agents
