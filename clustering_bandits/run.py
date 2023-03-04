@@ -48,7 +48,6 @@ if __name__ == '__main__':
 
         logs = {}
         a_hists = {}
-        t_splits = None
 
         psi = psi_cartesian
         env = PartitionedEnvironment(n_rounds=param_dict["horizon"],
@@ -70,7 +69,7 @@ if __name__ == '__main__':
                             psi=psi)
         core = Core(env, agent)
         # rewards, arms
-        clairvoyant_logs, a_hists['Clairvoyant'], _ = core.simulation(
+        clairvoyant_logs, a_hists['Clairvoyant'], _, _ = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         print(f"Clairvoyant - {time.time() - start_time:.2f}s")
         start_time = time.time()
@@ -78,26 +77,26 @@ if __name__ == '__main__':
         max_reward = clairvoyant_logs.max()
 
         agents_list = [
-            UCB1Agent(param_dict["arms"],
-                      param_dict["context_set"],
-                      max_reward),
-            LinUCBAgent(param_dict["arms"],
-                        param_dict["context_set"],
-                        param_dict["horizon"],
-                        1,
-                        param_dict["max_theta_norm_sum"],
-                        param_dict["max_arm_norm"],
-                        param_dict['sigma']),
+            # UCB1Agent(param_dict["arms"],
+            #           param_dict["context_set"],
+            #           max_reward),
+            # LinUCBAgent(param_dict["arms"],
+            #             param_dict["context_set"],
+            #             param_dict["horizon"],
+            #             1,
+            #             param_dict["max_theta_norm_sum"],
+            #             param_dict["max_arm_norm"],
+            #             param_dict['sigma']),
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["context_set"],
             #              max_reward),
-            INDLinUCBAgent(param_dict["arms"],
-                           param_dict["context_set"],
-                           param_dict["horizon"],
-                           1,
-                           param_dict["max_theta_norm_sum"],
-                           param_dict["max_arm_norm"],
-                           param_dict['sigma']),
+            # INDLinUCBAgent(param_dict["arms"],
+            #                param_dict["context_set"],
+            #                param_dict["horizon"],
+            #                1,
+            #                param_dict["max_theta_norm_sum"],
+            #                param_dict["max_arm_norm"],
+            #                param_dict['sigma']),
             PartitionedAgent(param_dict["arms"],
                              param_dict["context_set"],
                              param_dict["horizon"],
@@ -107,9 +106,9 @@ if __name__ == '__main__':
                              k=param_dict["psi_dim"],
                              err_th=1e-7,
                              sigma=param_dict['sigma']),
-            CLUB(param_dict["arms"],
-                 param_dict["context_set"],
-                 param_dict["horizon"]),
+            # CLUB(param_dict["arms"],
+            #      param_dict["context_set"],
+            #      param_dict["horizon"]),
             # ContextualLinUCBAgent(param_dict["arms"],
             #                       param_dict["context_set"],
             #                       psi,
@@ -125,7 +124,7 @@ if __name__ == '__main__':
         for agent in agents_list:
             agent_name = agent.__class__.__name__
             core = Core(env, agent)
-            logs[agent_name], a_hists[agent_name], t_splits = core.simulation(
+            logs[agent_name], a_hists[agent_name], t_splits, err_hists = core.simulation(
                 n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
             print(f"{agent_name} - {time.time() - start_time:.2f}s")
             start_time = time.time()
@@ -186,22 +185,44 @@ if __name__ == '__main__':
         x[-1] = min(x[-1],
                     len(np.mean(np.cumsum(first_log.T, axis=0), axis=1))-1)
         f, ax = plt.subplots(1, figsize=(20, 10))
-        sqrtn = np.sqrt(param_dict['n_epochs'])
-
+        n_epochs = param_dict['n_epochs']
+        sqrtn = np.sqrt(n_epochs)
         for i, label in enumerate(regret.keys()):
+            for j in range(n_epochs):  # epochs
+                ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
+                        label=f"c_{j}", color=f'C{j+1}')
             ax.plot(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[
-                    x], label=label, color=f'C{i+1}')
+                    x], label=label, color=f'C{i+n_epochs+1}')
             ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
-                            np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+1}')
+                            np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
-        if t_splits:
-            ax.axvline(x = t_splits[0], color = 'b', label = 'split time')
+        for i, t_s in enumerate(t_splits):  # epochs
+            ax.axvline(x=t_s, color=f'C{i+1}', label=f'split time c_{i}')
         ax.set_title('Cumulative Regret')
         ax.legend()
 
         # tikz.save(out_folder + f"tex/{testcase_id}_regret.tex")
         plt.savefig(out_dir + f"png/{testcase}_regret.png")
+
+        # Error plot
+        # TODO remove np.mean, doesn't make sense avg over epochs
+        # THIS PLOT ONLY MAKES SENSE with n_epochs=1
+        if err_hists.any():
+            f, ax = plt.subplots(1, figsize=(20, 10))
+            # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
+            n_contexts = err_hists.shape[1]
+            for i in range(n_contexts):
+                ax.plot(x, np.mean(err_hists[:, i], axis=0)[
+                        x], label=f"c_{i}", color=f'C{i+1}')
+            ax.set_xlim(left=0)
+            ax.set_ylim(bottom=0)
+            for i, t_s in enumerate(t_splits):
+                ax.axvline(x=t_s, color=f'C{i+1}', label=f'split time {i}')
+            ax.set_title('Squared Error by context')
+            ax.legend()
+
+            plt.savefig(out_dir + f"png/{testcase}_error.png")
 
         # logging
         final_logs[f'{testcase}'] = {label: np.mean(
