@@ -188,17 +188,18 @@ if __name__ == '__main__':
         n_epochs = param_dict['n_epochs']
         sqrtn = np.sqrt(n_epochs)
         for i, label in enumerate(regret.keys()):
-            for j in range(n_epochs):  # epochs
+            # one plot per epoch 
+            for j in range(n_epochs):
                 ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
-                        label=f"c_{j}", color=f'C{j+1}')
+                        label=f"{label} ep {j}", color=f'C{j+1}')
+                ax.axvline(x=t_splits[j], color=f'C{j+1}', label=f'split time ep {j}')
+            # mean and std
             ax.plot(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[
-                    x], label=label, color=f'C{i+n_epochs+1}')
+                    x], label=f"{label} mean", color=f'C{i+n_epochs+1}')
             ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
                             np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
         ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
-        for i, t_s in enumerate(t_splits):  # epochs
-            ax.axvline(x=t_s, color=f'C{i+1}', label=f'split time c_{i}')
+        ax.set_ylim(bottom=0)            
         ax.set_title('Cumulative Regret')
         ax.legend()
 
@@ -206,15 +207,15 @@ if __name__ == '__main__':
         plt.savefig(out_dir + f"png/{testcase}_regret.png")
 
         # Error plot
-        # TODO remove np.mean, doesn't make sense avg over epochs
-        # THIS PLOT ONLY MAKES SENSE with n_epochs=1
         if err_hists.any():
             f, ax = plt.subplots(1, figsize=(20, 10))
             # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
+            n_epochs = err_hists.shape[0]
             n_contexts = err_hists.shape[1]
-            for i in range(n_contexts):
-                ax.plot(x, np.mean(err_hists[:, i], axis=0)[
-                        x], label=f"c_{i}", color=f'C{i+1}')
+            for i in range(n_epochs):
+                for j in range(n_contexts):
+                    ax.plot(x, err_hists[i, j][x],
+                            label=f"ep {i} c_{j}", color=f'C{j+1}')
             ax.set_xlim(left=0)
             ax.set_ylim(bottom=0)
             for i, t_s in enumerate(t_splits):
