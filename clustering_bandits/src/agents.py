@@ -296,34 +296,33 @@ class PartitionedAgent(INDLinUCBAgent):
         return arm
 
     def update_arms(self, rewards):
-        arm_leader = c_i_leader = None
+        arm_leader = None
         for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
-
             if self.subtheta_global is None:
-                arm = self.arms[arm_i]
-                pred_reward_global = self.context_agent[c_i].theta_hat.T @ arm
-                error = (reward - pred_reward_global) ** 2
+                pred_reward = self.context_agent[c_i].theta_hat.T @ self.arms[arm_i]
+                error = (reward - pred_reward) ** 2
                 if error <= self.err_threshold:
-                    arm_leader, c_i_leader = arm, c_i
+                    arm_leader, c_i_leader = self.arms[arm_i], c_i
+                    print(f"error={error.squeeze()}\n" +
+                          f"t_split={self.t_split}\n" +
+                          f"theta_hat={self.context_agent[c_i].theta_hat.squeeze()}\n" +
+                          f"{c_i_leader=}\n")
             else:
-                # arm = self._local_to_global_arm(arm_i)
-                pred_reward_local = self.context_agent[c_i].theta_hat.T @ self.arms_local[arm_i]
+                # remove global arm contribution to reward to update local arm
                 reward_global = self.subtheta_global.T @ self.arms_global[self.last_pull_i]
-                error = (reward - reward_global - pred_reward_local) ** 2
-                # remove global arm contribution to update local arm
+                pred_reward_local = self.context_agent[c_i].theta_hat.T @ self.arms_local[arm_i]
+                error = (reward - (reward_global + pred_reward_local)) ** 2
                 reward -= reward_global
             self.update(reward, arm_i=arm_i, context_i=c_i)
             self.agents_err_hist[c_i].append(error)
 
         # recompute params at the end of round
         if arm_leader is not None:
-            self.t_split = self.t
             self._split_agents_params(arm_leader, c_i_leader)
+            self.t_split = self.t
         self.t += 1
 
     def _split_agents_params(self, arm, context_i):
-        print(
-            f"{self.t_split=}\n{self.context_agent[context_i].theta_hat=}\n{context_i=}")
         self.subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
         self.subarm_global = arm[:self.k]
         for agent in self.context_agent:

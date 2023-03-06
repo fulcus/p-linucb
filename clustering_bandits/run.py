@@ -90,13 +90,13 @@ if __name__ == '__main__':
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["context_set"],
             #              max_reward),
-            # INDLinUCBAgent(param_dict["arms"],
-            #                param_dict["context_set"],
-            #                param_dict["horizon"],
-            #                1,
-            #                param_dict["max_theta_norm_sum"],
-            #                param_dict["max_arm_norm"],
-            #                param_dict['sigma']),
+            INDLinUCBAgent(param_dict["arms"],
+                           param_dict["context_set"],
+                           param_dict["horizon"],
+                           1,
+                           param_dict["max_theta_norm_sum"],
+                           param_dict["max_arm_norm"],
+                           param_dict['sigma']),
             PartitionedAgent(param_dict["arms"],
                              param_dict["context_set"],
                              param_dict["horizon"],
@@ -176,8 +176,10 @@ if __name__ == '__main__':
         ax[2].set_title('Cumulative Regret')
         ax[2].legend()
 
+        testcase_dir = out_dir + f'png/{testcase}/'
+        os.makedirs(testcase_dir, exist_ok=True)
         # tikz.save(out_folder + f"tex/{testcase_id}_all.tex")
-        plt.savefig(out_dir + f"png/{testcase}_all.png")
+        plt.savefig(testcase_dir + "all.png")
 
         #  cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+50, step=50)
@@ -188,60 +190,84 @@ if __name__ == '__main__':
         n_epochs = param_dict['n_epochs']
         sqrtn = np.sqrt(n_epochs)
         for i, label in enumerate(regret.keys()):
-            # one plot per epoch 
+            # one plot per epoch
             for j in range(n_epochs):
                 ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
                         label=f"{label} ep {j}", color=f'C{j+1}')
-                ax.axvline(x=t_splits[j], color=f'C{j+1}', label=f'split time ep {j}')
+                if label == "PartitionedAgent":
+                    ax.axvline(
+                        x=t_splits[j], color=f'C{j+1}', label=f'split time ep {j}')
             # mean and std
             ax.plot(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[
                     x], label=f"{label} mean", color=f'C{i+n_epochs+1}')
             ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
                             np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
         ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)            
+        ax.set_ylim(bottom=0)
         ax.set_title('Cumulative Regret')
         ax.legend()
 
         # tikz.save(out_folder + f"tex/{testcase_id}_regret.tex")
-        plt.savefig(out_dir + f"png/{testcase}_regret.png")
+        plt.savefig(testcase_dir + "regret.png")
 
-        # Error plot
-        if err_hists.any():
-            f, ax = plt.subplots(1, figsize=(20, 10))
-            # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
-            n_epochs = err_hists.shape[0]
-            n_contexts = err_hists.shape[1]
-            for i in range(n_epochs):
-                for j in range(n_contexts):
-                    ax.plot(x, err_hists[i, j][x],
-                            label=f"ep {i} c_{j}", color=f'C{j+1}')
-            ax.set_xlim(left=0)
-            ax.set_ylim(bottom=0)
-            for i, t_s in enumerate(t_splits):
-                ax.axvline(x=t_s, color=f'C{i+1}', label=f'split time {i}')
-            ax.set_title('Squared Error by context')
-            ax.legend()
+# Error plot
+if err_hists.any():
+    # f, ax = plt.subplots(1, figsize=(20, 10))
+    # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
+    n_epochs = err_hists.shape[0]
+    n_contexts = err_hists.shape[1]
 
-            plt.savefig(out_dir + f"png/{testcase}_error.png")
+    err_logs = {}
+    # by epoch
+    for i in range(n_epochs):
+        err_logs[i] = {}
+        f, ax = plt.subplots(1, figsize=(20, 10))
+        for j in range(n_contexts):
+            err_logs[i][j] = err_hists.squeeze()[i, j].tolist()
+            ax.plot(x, err_hists[i, j][x],
+                    label=f"c_{j}", color=f'C{j+1}')
+        ax.axvline(x=t_splits[i], color=f'C{i+1}', label=f'split time')
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.set_title(f'Squared Error, Epoch {i}')
+        ax.legend()
+        plt.savefig(testcase_dir + f"err_ep_{i}.png")
 
-        # logging
-        final_logs[f'{testcase}'] = {label: np.mean(
-            np.sum(regret[label].T, axis=0)) for label in regret.keys()}
+    with open(testcase_dir + "err.json", "w") as f:
+        json.dump(err_logs, f, indent=4)
 
-        # arm history plots
-        n_arms = param_dict["n_arms"]
-        f, ax = plt.subplots(3, 2, figsize=(20, 30))
+    # by context
+    for j in range(n_contexts):
+        f, ax = plt.subplots(1, figsize=(20, 10))
+        for i in range(n_epochs):
+            ax.plot(x, err_hists[i, j][x],
+                    label=f"ep {i}", color=f'C{i+1}')
+            ax.axvline(x=t_splits[i],
+                       color=f'C{i+1}', label=f'split time ep {i}')
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+        ax.set_title(f'Squared Error, Context {j}')
+        ax.legend()
+        plt.savefig(testcase_dir + f"err_c_{j}.png")
 
-        for ax_, label in zip(f.axes, a_hists.keys()):
-            bins = np.arange(n_arms+1) - 0.5
-            ax_.hist(a_hists[label].flatten(), bins=bins)
-            ax_.set_xticks(range(n_arms))
-            ax_.set_xlim(-1, n_arms)
-            ax_.set_title(label)
+
+    # logging
+    final_logs[f'{testcase}'] = {label: np.mean(
+        np.sum(regret[label].T, axis=0)) for label in regret.keys()}
+
+    # arm history plots
+    n_arms = param_dict["n_arms"]
+    f, ax = plt.subplots(3, 2, figsize=(20, 30))
+
+    for ax_, label in zip(f.axes, a_hists.keys()):
+        bins = np.arange(n_arms+1) - 0.5
+        ax_.hist(a_hists[label].flatten(), bins=bins)
+        ax_.set_xticks(range(n_arms))
+        ax_.set_xlim(-1, n_arms)
+        ax_.set_title(label)
 
         # tikz.save(out_dir + f"tex/{testcase}_a_hist.tex")
-        plt.savefig(out_dir + f"png/{testcase}_a_hist.png")
+        plt.savefig(testcase_dir + f"a_hist.png")
 
         f, ax = plt.subplots(3, 2, figsize=(20, 30))
         for ax_, label in zip(f.axes, a_hists.keys()):
@@ -250,7 +276,7 @@ if __name__ == '__main__':
             ax_.set_title(label)
 
         # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
-        plt.savefig(out_dir + f"png/{testcase}_a_hist_temp.png")
+        plt.savefig(testcase_dir + f"a_hist_temp.png")
 
     with open(out_dir + f"logs.json", "w") as f:
         json.dump(final_logs, f, indent=4)
