@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from src.utils import psi_lin
-
+from src.utils import moving_average
 
 class Agent(ABC):
     def __init__(self, arms, context_set):
@@ -107,8 +106,6 @@ class LinUCBAgent(Agent):
 
         self.last_ucb = np.zeros(self.n_arms)
         self.reward_hist = []
-        self.theta_hat_hist = []
-        self.error_hist = []
 
     def pull_arm(self, context_i=None):
         if len(self.a_hist) < self.arm_dim:
@@ -129,8 +126,6 @@ class LinUCBAgent(Agent):
         self.theta_hat = self.V_t_inv @ self.b_vect
         # update hist
         self.reward_hist.append(reward)
-        self.theta_hat_hist.append(self.theta_hat)
-        self.error_hist.append(reward - self.theta_hat.T @ last_pull)
 
     def _estimate_linucb_arm(self):
         bound = self._beta_t_fun_linucb()
@@ -301,25 +296,26 @@ class PartitionedAgent(INDLinUCBAgent):
             if self.subtheta_global is None:
                 pred_reward = self.context_agent[c_i].theta_hat.T @ self.arms[arm_i]
                 error = (reward - pred_reward) ** 2
-                if error <= self.err_threshold:
+                self.agents_err_hist[c_i].append(error)
+                if moving_average(self.agents_err_hist[c_i], win=10) <= self.err_threshold:
                     arm_leader, c_i_leader = self.arms[arm_i], c_i
                     print(f"error={error.squeeze()}\n" +
-                          f"t_split={self.t_split}\n" +
                           f"theta_hat={self.context_agent[c_i].theta_hat.squeeze()}\n" +
-                          f"{c_i_leader=}\n")
+                          f"{c_i_leader=}")
             else:
                 # remove global arm contribution to reward to update local arm
                 reward_global = self.subtheta_global.T @ self.arms_global[self.last_pull_i]
                 pred_reward_local = self.context_agent[c_i].theta_hat.T @ self.arms_local[arm_i]
                 error = (reward - (reward_global + pred_reward_local)) ** 2
                 reward -= reward_global
+                self.agents_err_hist[c_i].append(error)
             self.update(reward, arm_i=arm_i, context_i=c_i)
-            self.agents_err_hist[c_i].append(error)
 
         # recompute params at the end of round
         if arm_leader is not None:
             self._split_agents_params(arm_leader, c_i_leader)
             self.t_split = self.t
+            print(f"t_split={self.t_split}\n")
         self.t += 1
 
     def _split_agents_params(self, arm, context_i):

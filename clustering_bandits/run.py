@@ -90,13 +90,13 @@ if __name__ == '__main__':
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["context_set"],
             #              max_reward),
-            INDLinUCBAgent(param_dict["arms"],
-                           param_dict["context_set"],
-                           param_dict["horizon"],
-                           1,
-                           param_dict["max_theta_norm_sum"],
-                           param_dict["max_arm_norm"],
-                           param_dict['sigma']),
+            # INDLinUCBAgent(param_dict["arms"],
+            #                param_dict["context_set"],
+            #                param_dict["horizon"],
+            #                1,
+            #                param_dict["max_theta_norm_sum"],
+            #                param_dict["max_arm_norm"],
+            #                param_dict['sigma']),
             PartitionedAgent(param_dict["arms"],
                              param_dict["context_set"],
                              param_dict["horizon"],
@@ -104,7 +104,7 @@ if __name__ == '__main__':
                              param_dict["max_theta_norm_sum"],
                              param_dict["max_arm_norm"],
                              k=param_dict["psi_dim"],
-                             err_th=1e-7,
+                             err_th=1e-1,
                              sigma=param_dict['sigma']),
             # CLUB(param_dict["arms"],
             #      param_dict["context_set"],
@@ -194,7 +194,7 @@ if __name__ == '__main__':
             for j in range(n_epochs):
                 ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
                         label=f"{label} ep {j}", color=f'C{j+1}')
-                if label == "PartitionedAgent":
+                if label == "PartitionedAgent" and t_splits[j] is not None:
                     ax.axvline(
                         x=t_splits[j], color=f'C{j+1}', label=f'split time ep {j}')
             # mean and std
@@ -212,12 +212,10 @@ if __name__ == '__main__':
 
 # Error plot
 if err_hists.any():
-    # f, ax = plt.subplots(1, figsize=(20, 10))
     # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
     n_epochs = err_hists.shape[0]
     n_contexts = err_hists.shape[1]
-
-    err_logs = {}
+    err_logs = {}  # epoch: context: [errors at each timestep]
     # by epoch
     for i in range(n_epochs):
         err_logs[i] = {}
@@ -226,7 +224,9 @@ if err_hists.any():
             err_logs[i][j] = err_hists.squeeze()[i, j].tolist()
             ax.plot(x, err_hists[i, j][x],
                     label=f"c_{j}", color=f'C{j+1}')
-        ax.axvline(x=t_splits[i], color=f'C{i+1}', label=f'split time')
+            if label == "PartitionedAgent" and t_splits[i] is not None:
+                ax.axvline(x=t_splits[i], color=f'C{i+1}', label=f'split time')
+
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         ax.set_title(f'Squared Error, Epoch {i}')
@@ -242,14 +242,14 @@ if err_hists.any():
         for i in range(n_epochs):
             ax.plot(x, err_hists[i, j][x],
                     label=f"ep {i}", color=f'C{i+1}')
-            ax.axvline(x=t_splits[i],
-                       color=f'C{i+1}', label=f'split time ep {i}')
+            if label == "PartitionedAgent" and t_splits[i] is not None:
+                ax.axvline(x=t_splits[i], color=f'C{i+1}',
+                           label=f'split time ep {i}')
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         ax.set_title(f'Squared Error, Context {j}')
         ax.legend()
         plt.savefig(testcase_dir + f"err_c_{j}.png")
-
 
     # logging
     final_logs[f'{testcase}'] = {label: np.mean(

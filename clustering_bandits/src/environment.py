@@ -18,7 +18,7 @@ class ContextualLinearEnvironment:
         self.rewards = np.array([])
         self.n_contexts = self.context_set.shape[0]
         self.contexts_i = np.arange(self.n_contexts)
-        self.reset(0)
+        self.reset(random_state)
 
     def round_all(self, pulled_arms_i):
         """computes reward for each context, action pair

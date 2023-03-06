@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from numpy.ma import average
 
 
 def psi_lin(a, x):
@@ -29,3 +30,8 @@ def save_heatmap(fpath, arms, context_set, theta, theta_p):
     # plt.show()
     # df.to_csv(out_dir + 'table.csv')
     # exit(0)
+
+def moving_average(arr, win=5):
+    if len(arr) < win:
+        return np.inf
+    return sum(arr[-win:]) / win
