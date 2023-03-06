@@ -90,13 +90,13 @@ if __name__ == '__main__':
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["context_set"],
             #              max_reward),
-            # INDLinUCBAgent(param_dict["arms"],
-            #                param_dict["context_set"],
-            #                param_dict["horizon"],
-            #                1,
-            #                param_dict["max_theta_norm_sum"],
-            #                param_dict["max_arm_norm"],
-            #                param_dict['sigma']),
+            INDLinUCBAgent(param_dict["arms"],
+                           param_dict["context_set"],
+                           param_dict["horizon"],
+                           1,
+                           param_dict["max_theta_norm_sum"],
+                           param_dict["max_arm_norm"],
+                           param_dict['sigma']),
             PartitionedAgent(param_dict["arms"],
                              param_dict["context_set"],
                              param_dict["horizon"],
@@ -106,9 +106,9 @@ if __name__ == '__main__':
                              k=param_dict["psi_dim"],
                              err_th=1e-1,
                              sigma=param_dict['sigma']),
-            # CLUB(param_dict["arms"],
-            #      param_dict["context_set"],
-            #      param_dict["horizon"]),
+            CLUB(param_dict["arms"],
+                 param_dict["context_set"],
+                 param_dict["horizon"]),
             # ContextualLinUCBAgent(param_dict["arms"],
             #                       param_dict["context_set"],
             #                       psi,
@@ -124,8 +124,13 @@ if __name__ == '__main__':
         for agent in agents_list:
             agent_name = agent.__class__.__name__
             core = Core(env, agent)
-            logs[agent_name], a_hists[agent_name], t_splits, err_hists = core.simulation(
-                n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
+            if isinstance(agent, PartitionedAgent):
+                logs[agent_name], a_hists[agent_name], t_splits, err_hists = core.simulation(
+                    n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
+            else:
+                logs[agent_name], a_hists[agent_name], _, _ = core.simulation(
+                    n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
+
             print(f"{agent_name} - {time.time() - start_time:.2f}s")
             start_time = time.time()
         print(f"Total training {time.time() - start_all_time:.2f}s")
@@ -140,6 +145,7 @@ if __name__ == '__main__':
             for i in range(param_dict['n_epochs']):
                 regret[label][i, :] = clairvoyant_logs[i, :] - \
                     logs[label][i, :]
+
 
         # inst reward, inst regret and cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+1, step=250)
@@ -210,73 +216,73 @@ if __name__ == '__main__':
         # tikz.save(out_folder + f"tex/{testcase_id}_regret.tex")
         plt.savefig(testcase_dir + "regret.png")
 
-# Error plot
-if err_hists.any():
-    # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
-    n_epochs = err_hists.shape[0]
-    n_contexts = err_hists.shape[1]
-    err_logs = {}  # epoch: context: [errors at each timestep]
-    # by epoch
-    for i in range(n_epochs):
-        err_logs[i] = {}
-        f, ax = plt.subplots(1, figsize=(20, 10))
-        for j in range(n_contexts):
-            err_logs[i][j] = err_hists.squeeze()[i, j].tolist()
-            ax.plot(x, err_hists[i, j][x],
-                    label=f"c_{j}", color=f'C{j+1}')
-            if label == "PartitionedAgent" and t_splits[i] is not None:
-                ax.axvline(x=t_splits[i], color=f'C{i+1}', label=f'split time')
+        # Error plot
+        if err_hists.any():
+            # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
+            n_epochs = err_hists.shape[0]
+            n_contexts = err_hists.shape[1]
+            err_logs = {}  # epoch: context: [errors at each timestep]
+            # by epoch
+            for i in range(n_epochs):
+                err_logs[i] = {}
+                f, ax = plt.subplots(1, figsize=(20, 10))
+                for j in range(n_contexts):
+                    err_logs[i][j] = err_hists.squeeze()[i, j].tolist()
+                    ax.plot(x, err_hists[i, j][x],
+                            label=f"c_{j}", color=f'C{j+1}')
+                    if label == "PartitionedAgent" and t_splits[i] is not None:
+                        ax.axvline(x=t_splits[i], color=f'C{i+1}', label=f'split time')
 
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
-        ax.set_title(f'Squared Error, Epoch {i}')
-        ax.legend()
-        plt.savefig(testcase_dir + f"err_ep_{i}.png")
+                ax.set_xlim(left=0)
+                ax.set_ylim(bottom=0)
+                ax.set_title(f'Squared Error, Epoch {i}')
+                ax.legend()
+                plt.savefig(testcase_dir + f"err_ep_{i}.png")
 
-    with open(testcase_dir + "err.json", "w") as f:
-        json.dump(err_logs, f, indent=4)
+            with open(testcase_dir + "err.json", "w") as f:
+                json.dump(err_logs, f, indent=4)
 
-    # by context
-    for j in range(n_contexts):
-        f, ax = plt.subplots(1, figsize=(20, 10))
-        for i in range(n_epochs):
-            ax.plot(x, err_hists[i, j][x],
-                    label=f"ep {i}", color=f'C{i+1}')
-            if label == "PartitionedAgent" and t_splits[i] is not None:
-                ax.axvline(x=t_splits[i], color=f'C{i+1}',
-                           label=f'split time ep {i}')
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=0)
-        ax.set_title(f'Squared Error, Context {j}')
-        ax.legend()
-        plt.savefig(testcase_dir + f"err_c_{j}.png")
+            # by context
+            for j in range(n_contexts):
+                f, ax = plt.subplots(1, figsize=(20, 10))
+                for i in range(n_epochs):
+                    ax.plot(x, err_hists[i, j][x],
+                            label=f"ep {i}", color=f'C{i+1}')
+                    if label == "PartitionedAgent" and t_splits[i] is not None:
+                        ax.axvline(x=t_splits[i], color=f'C{i+1}',
+                                label=f'split time ep {i}')
+                ax.set_xlim(left=0)
+                ax.set_ylim(bottom=0)
+                ax.set_title(f'Squared Error, Context {j}')
+                ax.legend()
+                plt.savefig(testcase_dir + f"err_c_{j}.png")
 
-    # logging
-    final_logs[f'{testcase}'] = {label: np.mean(
-        np.sum(regret[label].T, axis=0)) for label in regret.keys()}
+            # logging
+            final_logs[f'{testcase}'] = {label: np.mean(
+                np.sum(regret[label].T, axis=0)) for label in regret.keys()}
 
-    # arm history plots
-    n_arms = param_dict["n_arms"]
-    f, ax = plt.subplots(3, 2, figsize=(20, 30))
+            # arm history plots
+            n_arms = param_dict["n_arms"]
+            f, ax = plt.subplots(3, 2, figsize=(20, 30))
 
-    for ax_, label in zip(f.axes, a_hists.keys()):
-        bins = np.arange(n_arms+1) - 0.5
-        ax_.hist(a_hists[label].flatten(), bins=bins)
-        ax_.set_xticks(range(n_arms))
-        ax_.set_xlim(-1, n_arms)
-        ax_.set_title(label)
+            for ax_, label in zip(f.axes, a_hists.keys()):
+                bins = np.arange(n_arms+1) - 0.5
+                ax_.hist(a_hists[label].flatten(), bins=bins)
+                ax_.set_xticks(range(n_arms))
+                ax_.set_xlim(-1, n_arms)
+                ax_.set_title(label)
 
-        # tikz.save(out_dir + f"tex/{testcase}_a_hist.tex")
-        plt.savefig(testcase_dir + f"a_hist.png")
+                # tikz.save(out_dir + f"tex/{testcase}_a_hist.tex")
+                plt.savefig(testcase_dir + f"a_hist.png")
 
-        f, ax = plt.subplots(3, 2, figsize=(20, 30))
-        for ax_, label in zip(f.axes, a_hists.keys()):
-            bins = np.arange(n_arms+1) - 0.5
-            ax_.plot(a_hists[label][-1, :])
-            ax_.set_title(label)
+                f, ax = plt.subplots(3, 2, figsize=(20, 30))
+                for ax_, label in zip(f.axes, a_hists.keys()):
+                    bins = np.arange(n_arms+1) - 0.5
+                    ax_.plot(a_hists[label][-1, :])
+                    ax_.set_title(label)
 
-        # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
-        plt.savefig(testcase_dir + f"a_hist_temp.png")
+                # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
+                plt.savefig(testcase_dir + f"a_hist_temp.png")
 
     with open(out_dir + f"logs.json", "w") as f:
         json.dump(final_logs, f, indent=4)

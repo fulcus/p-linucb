@@ -61,5 +61,14 @@ class PartitionedEnvironment(ContextualLinearEnvironment):
         arm = self.arms[arm_i]
         obs_reward = (self.theta @ arm[:self.k]
                       + self.theta_p[x_i] @ arm[self.k:]
-                      + self.noise[self.t])
+                      + self.noise[self.t, x_i])
         return obs_reward
+
+    def reset(self, i=0):
+        self.t = 0
+        self.rewards = np.array([])
+        np.random.seed(self.random_state + i)
+        # different noise for each context
+        self.noise = np.random.normal(0, self.sigma,
+                                      size=(self.n_rounds, self.n_contexts))
+        return self

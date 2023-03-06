@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from src.utils import moving_average
 
+
 class Agent(ABC):
     def __init__(self, arms, context_set):
         #  assert context_set.shape[1] == arms.shape[1]
@@ -266,8 +267,6 @@ class PartitionedAgent(INDLinUCBAgent):
         self.agents_err_hist = [[] for _ in range(self.n_contexts)]
 
         self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        # self.arms_local = np.unique(
-        #     np.delete(self.arms, np.s_[:self.k], axis=1), axis=0)
         self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
         self.max_arm_norm_local = np.max(
             [np.linalg.norm(a) for a in self.arms_local])
@@ -279,9 +278,6 @@ class PartitionedAgent(INDLinUCBAgent):
         if self.subarm_global is not None:
             arm = self._local_to_global_arm(arm_i)
             arm_i = self.arm_index[tuple(arm)]
-            # subarm_local = self.arms_local[arm_i]
-            # arm = np.concatenate([self.subarm_global, subarm_local])
-            # arm_i = self.arm_index[tuple(arm)]
         self.a_hist.append(arm_i)
         return arm_i
 
