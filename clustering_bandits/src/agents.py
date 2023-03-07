@@ -26,12 +26,11 @@ class Agent(ABC):
 
     @abstractmethod
     def update(self, reward, *args, **kwargs):
-        pass
+        self.t += 1
 
     def update_arms(self, rewards):
         for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
             self.update(reward, arm_i=arm_i, context_i=c_i)
-        self.t += 1
 
 
 class Clairvoyant(Agent):
@@ -59,6 +58,7 @@ class Clairvoyant(Agent):
     def update(self, reward, arm_i=None, context_i=None):
         if arm_i is not None:
             self.last_pull_i = arm_i
+        self.t += 1
 
 
 class UCB1Agent(Agent):
@@ -87,16 +87,17 @@ class UCB1Agent(Agent):
                 self.avg_reward[arm_i]
                 * self.n_pulls[arm_i] + reward)
                 / (self.n_pulls[arm_i] + 1))
+        self.t += 1
 
 
 class LinUCBAgent(Agent):
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm_sum, max_arm_norm, sigma=1):
+                 max_theta_norm, max_arm_norm, sigma=1):
         super().__init__(arms, context_set)
         assert lmbd > 0
         self.lmbd = lmbd
         self.horizon = horizon
-        self.max_theta_norm_sum = max_theta_norm_sum
+        self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
 
@@ -128,6 +129,7 @@ class LinUCBAgent(Agent):
         self.theta_hat = self.V_t_inv @ self.b_vect
         # update hist
         self.reward_hist.append(reward)
+        self.t += 1
 
     def _estimate_linucb_arm(self):
         bound = self._beta_t_fun_linucb()
@@ -138,8 +140,8 @@ class LinUCBAgent(Agent):
         return np.argmax(self.last_ucb)
 
     def _beta_t_fun_linucb(self):
-        return self.max_theta_norm_sum * np.sqrt(self.lmbd) + \
-            np.sqrt(2 * self.sigma**2 * np.log(self.horizon) +
+        return self.max_theta_norm * np.sqrt(self.lmbd) + \
+            np.sqrt(2 * self.sigma**2 * np.log(self.t) +
                     np.log(np.linalg.det(self.V_t) / (self.lmbd ** self.arm_dim)))
 
 
@@ -176,6 +178,7 @@ class INDLinUCBAgent(Agent):
             self.last_pull_i = arm_i
         self.context_agent[context_i].update(
             reward, self.last_pull_i, context_i)
+        self.t += 1
 
 
 class PartitionedAgent(INDLinUCBAgent):
@@ -240,7 +243,6 @@ class PartitionedAgent(INDLinUCBAgent):
             self._split_agents_params(arm_leader, c_i_leader)
             self.t_split = self.t
             print(f"t_split={self.t_split}\n")
-        self.t += 1
 
     def _split_agents_params(self, arm, context_i):
         self.subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
