@@ -65,7 +65,7 @@ class UCB1Agent(Agent):
     def __init__(self, arms, context_set, max_reward=1):
         super().__init__(arms, context_set)
         self.max_reward = max_reward
-        self.avg_reward = np.ones(self.n_arms)*np.inf # initializing 
+        self.avg_reward = np.ones(self.n_arms) * np.inf
         self.n_pulls = np.zeros(self.n_arms)
 
     def pull_arm(self, *args, **kwargs):
@@ -82,7 +82,7 @@ class UCB1Agent(Agent):
             self.last_pull_i = arm_i
         if self.n_pulls[self.last_pull_i] == 1:
             self.avg_reward[arm_i] = reward
-        else: 
+        else:
             self.avg_reward[arm_i] = ((
                 self.avg_reward[arm_i]
                 * self.n_pulls[arm_i] + reward)
@@ -91,13 +91,14 @@ class UCB1Agent(Agent):
 
 class LinUCBAgent(Agent):
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm_sum, max_arm_norm):
+                 max_theta_norm_sum, max_arm_norm, sigma=1):
         super().__init__(arms, context_set)
         assert lmbd > 0
         self.lmbd = lmbd
         self.horizon = horizon
         self.max_theta_norm_sum = max_theta_norm_sum
         self.max_arm_norm = max_arm_norm
+        self.sigma = sigma
 
         self.last_pull_i = 0
         self.V_t = self.lmbd * np.eye(self.arm_dim)
@@ -137,20 +138,22 @@ class LinUCBAgent(Agent):
         return np.argmax(self.last_ucb)
 
     def _beta_t_fun_linucb(self):
-        return self.max_theta_norm_sum*np.sqrt(self.lmbd) + \
-                np.sqrt(2*np.log(self.horizon)+np.log(np.linalg.det(self.V_t)/ (self.arm_dim * self.lmbd)))
+        return self.max_theta_norm_sum * np.sqrt(self.lmbd) + \
+            np.sqrt(2 * self.sigma**2 * np.log(self.horizon) +
+                    np.log(np.linalg.det(self.V_t) / (self.lmbd ** self.arm_dim)))
 
 
 class INDLinUCBAgent(Agent):
     """One independent LinUCBAgent instance per context - BASELINE"""
 
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm_sum, max_arm_norm):
+                 max_theta_norm_sum, max_arm_norm, sigma=1):
         super().__init__(arms, context_set)
         self.lmbd = lmbd
         self.horizon = horizon
         self.max_theta_norm_sum = max_theta_norm_sum
         self.max_arm_norm = max_arm_norm
+        self.sigma = sigma
         self.context_agent = [
             LinUCBAgent(
                 self.arms,
@@ -171,7 +174,8 @@ class INDLinUCBAgent(Agent):
     def update(self, reward, context_i, arm_i=None):
         if arm_i is not None:
             self.last_pull_i = arm_i
-        self.context_agent[context_i].update(reward, self.last_pull_i, context_i)
+        self.context_agent[context_i].update(
+            reward, self.last_pull_i, context_i)
 
 
 class PartitionedAgent(INDLinUCBAgent):
@@ -180,9 +184,9 @@ class PartitionedAgent(INDLinUCBAgent):
     the first k components of theta for all."""
 
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm_sum, max_arm_norm, k, err_th):
+                 max_theta_norm_sum, max_arm_norm, k, err_th, sigma):
         super().__init__(arms, context_set, horizon, lmbd,
-                         max_theta_norm_sum, max_arm_norm)
+                         max_theta_norm_sum, max_arm_norm, sigma)
         self.k = k
         self.err_threshold = err_th
         self.subtheta_global = None
