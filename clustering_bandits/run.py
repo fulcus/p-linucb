@@ -42,10 +42,6 @@ if __name__ == '__main__':
             if type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
 
-        # save_heatmap(out_dir + 'png/' + testcase + '_heat',
-        #              param_dict["arms"], param_dict["context_set"],
-        #              param_dict["theta"], param_dict["theta_p"])
-
         logs = {}
         a_hists = {}
 

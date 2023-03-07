@@ -5,7 +5,6 @@ from src.utils import moving_average
 
 class Agent(ABC):
     def __init__(self, arms, context_set):
-        #  assert context_set.shape[1] == arms.shape[1]
         self.arms = arms
         self.context_set = context_set
         self.n_contexts = context_set.shape[0]
@@ -49,7 +48,6 @@ class Clairvoyant(Agent):
         exp_rewards = np.zeros(self.n_arms)
         context = self.context_set[context_i]
         for i, arm in enumerate(self.arms):
-            #  psi = self.psi(arm, context)
             exp_rewards[i] = (self.theta @ arm[:self.k]
                               + self.theta_p[context_i] @ arm[self.k:])
         # TODO can remove last_pull_i from everywhere,
@@ -183,7 +181,6 @@ class ContextualLinUCBAgent(LinUCBAgent):
         for i, arm in enumerate(self.arms):
             psi = self.psi(arm, self.context_set[context_i])
             psi = psi.reshape(-1, 1)
-            # TODO fix dim
             self.last_ucb[i] = (self.theta_hat.T @ psi + bound
                                 * np.sqrt(psi.T @ self.V_t_inv @ psi))
         return np.argmax(self.last_ucb)
