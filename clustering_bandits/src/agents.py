@@ -12,7 +12,6 @@ class Agent(ABC):
         self.arm_dim = arms.shape[1]
         self.t = 0
         self.a_hist = []
-        self.last_pull_i = None
         self.last_pulls = [[] for _ in range(self.n_contexts)]
 
     @abstractmethod
@@ -36,22 +35,17 @@ class Agent(ABC):
 class Clairvoyant(Agent):
     """Always pulls the optimal arm"""
 
-    def __init__(self, arms, context_set, theta, theta_p, k, psi):
+    def __init__(self, arms, context_set, theta, theta_p, k):
         super().__init__(arms, context_set)
         self.theta = theta
         self.theta_p = theta_p
-        #  TODO remove context stuff
-        self.psi = psi
         self.k = k
 
     def pull_arm(self, context_i):
         exp_rewards = np.zeros(self.n_arms)
-        # context = self.context_set[context_i]
         for i, arm in enumerate(self.arms):
             exp_rewards[i] = (self.theta @ arm[:self.k]
                               + self.theta_p[context_i] @ arm[self.k:])
-        # TODO can remove last_pull_i from everywhere,
-        # since it's always given as parameter to update
         arm_i = np.argmax(exp_rewards)
         self.a_hist.append(arm_i)
         return self.arms[arm_i]
@@ -72,10 +66,10 @@ class UCB1Agent(Agent):
         ucb1 = [self.avg_reward[a] + self.max_reward *
                 np.sqrt(2 * np.log(self.t)
                 / self.n_pulls[a]) for a in range(self.n_arms)]
-        self.last_pull_i = np.argmax(ucb1)
-        self.n_pulls[self.last_pull_i] += 1
-        self.a_hist.append(self.last_pull_i)
-        return self.arms[self.last_pull_i]
+        arm_i = np.argmax(ucb1)
+        self.n_pulls[arm_i] += 1
+        self.a_hist.append(arm_i)
+        return self.arms[arm_i]
 
     def update(self, reward, arm, *args, **kwargs):
         arm_i = self.arm_index[tuple(arm)]
@@ -101,7 +95,6 @@ class LinUCBAgent(Agent):
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
 
-        self.last_pull_i = 0
         self.V_t = self.lmbd * np.eye(self.arm_dim)
         self.V_t_inv = np.linalg.inv(self.V_t)
         self.b_vect = np.zeros((self.arm_dim, 1))
@@ -185,21 +178,22 @@ class PartitionedAgent(INDLinUCBAgent):
     the first k components of theta for all."""
 
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm_sum, max_arm_norm, k, err_th, sigma):
+                 max_theta_norm_sum, max_arm_norm, k=2, err_th=0.1, win=10, sigma=1):
         super().__init__(arms, context_set, horizon, lmbd,
                          max_theta_norm_sum, max_arm_norm, sigma)
         self.k = k
-        self.err_threshold = err_th
+        self.err_th = err_th
+        self.win = win
+
+        self.t_split = None
         self.reward_global = None
         self.subarm_global = None
-        self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
-        self.t_split = None
-        self.agents_err_hist = [[] for _ in range(self.n_contexts)]
-
         self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
         self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
         self.max_arm_norm_local = np.max(
             [np.linalg.norm(a) for a in self.arms_local])
+        self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
+        self.agents_err_hist = [[] for _ in range(self.n_contexts)]
 
     def pull_arm(self, context_i):
         arm = self.context_agent[context_i].pull_arm()
@@ -217,16 +211,14 @@ class PartitionedAgent(INDLinUCBAgent):
                 pred_reward = self.context_agent[c_i].theta_hat.T @ arm
                 error = (reward - pred_reward) ** 2
                 self.agents_err_hist[c_i].append(error)
-                if moving_average(self.agents_err_hist[c_i], win=10) <= self.err_threshold:
+                if moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
                     print(f"error={error.squeeze()}\n" +
                           f"theta_hat={self.context_agent[c_i].theta_hat.squeeze()}\n" +
                           f"{c_i_leader=}")
             else:
                 # remove global arm contribution to reward to update local arm
-                # self.reward_global = self.subtheta_global.T @ self.arms_global[self.last_pull_i]
                 arm = arm[self.k:]
-                # self.arms_local[arm_i]
                 pred_reward_local = self.context_agent[c_i].theta_hat.T @ arm
                 error = (reward - (self.reward_global + pred_reward_local)) ** 2
                 reward -= self.reward_global

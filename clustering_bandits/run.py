@@ -45,14 +45,12 @@ if __name__ == '__main__':
         logs = {}
         a_hists = {}
 
-        psi = psi_cartesian
         env = PartitionedEnvironment(n_rounds=param_dict["horizon"],
                                      arms=param_dict["arms"],
                                      context_set=param_dict["context_set"],
                                      theta=param_dict["theta"],
                                      theta_p=param_dict["theta_p"],
-                                     psi=psi,
-                                     k=param_dict["psi_dim"],
+                                     k=param_dict["split_dim"],
                                      sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
 
@@ -61,8 +59,7 @@ if __name__ == '__main__':
                             context_set=param_dict["context_set"],
                             theta=param_dict["theta"],
                             theta_p=param_dict["theta_p"],
-                            k=param_dict["psi_dim"],
-                            psi=psi)
+                            k=param_dict["split_dim"])
         core = Core(env, agent)
         # rewards, arms
         clairvoyant_logs, a_hists['Clairvoyant'], _, _ = core.simulation(
@@ -99,8 +96,9 @@ if __name__ == '__main__':
                              1,
                              param_dict["max_theta_norm_sum"],
                              param_dict["max_arm_norm"],
-                             k=param_dict["psi_dim"],
+                             k=param_dict["split_dim"],
                              err_th=1e-1,
+                             win=10,
                              sigma=param_dict['sigma']),
             CLUB(param_dict["arms"],
                  param_dict["context_set"],

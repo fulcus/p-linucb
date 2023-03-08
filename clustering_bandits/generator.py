@@ -33,8 +33,8 @@ if __name__ == '__main__':
     n_contexts = 10
     arm_dim = 4
     ctx_dim = 3
-    # psi_dim = arm_dim * ctx_dim
-    psi_dim = 2
+    # split_dim = arm_dim * ctx_dim
+    split_dim = 2
 
     if args.arm == 'v':
         arm_coord_norm = 1
@@ -55,9 +55,9 @@ if __name__ == '__main__':
     max_arm_norm = math.ceil(np.max([np.linalg.norm(a) for a in arms]))
 
     np.random.seed(args.seed)
-    theta = np.random.uniform(-3.0, 3.0, size=(1, psi_dim)).round(2).tolist()
+    theta = np.random.uniform(-3.0, 3.0, size=(1, split_dim)).round(2).tolist()
     np.random.seed(args.seed)
-    theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, psi_dim))
+    theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, split_dim))
     theta_p = theta_p.round(2).tolist()
 
     # only valid for v arms
@@ -75,7 +75,7 @@ if __name__ == '__main__':
         "sigma": 0.1,
         "seed": args.seed,
         "n_arms": n_arms,
-        "psi_dim": psi_dim,
+        "split_dim": split_dim,
         "max_arm_norm": max_arm_norm,
         "max_theta_norm_sum": max_theta_norm_sum,
         "max_theta_norm_shared": max_theta_norm_shared,
