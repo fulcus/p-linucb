@@ -105,15 +105,6 @@ if __name__ == '__main__':
             CLUB(param_dict["arms"],
                  param_dict["context_set"],
                  param_dict["horizon"]),
-            # ContextualLinUCBAgent(param_dict["arms"],
-            #                       param_dict["context_set"],
-            #                       psi,
-            #                       param_dict["psi_dim"],
-            #                       param_dict["horizon"],
-            #                       1,
-            #                       param_dict["max_theta_norm_sum"],
-            #                       param_dict["max_arm_norm"],
-            #                       param_dict['sigma']),
         ]
 
         # Train all agents

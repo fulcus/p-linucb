@@ -5,8 +5,8 @@ from src.agents import Agent
 
 
 class Cluster:
-    def __init__(self, users, M, b, N):
-        self.users = users  # a list/array of users
+    def __init__(self, contexts, M, b, N):
+        self.contexts = contexts
         self.M = M
         self.b = b
         self.N = N
@@ -33,7 +33,6 @@ class CLUB(Agent):
     def __init__(self, arms, context_set, horizon, edge_probability=1):
         super().__init__(arms, context_set)
         self.context_indexes = range(self.n_contexts)
-        # Base
         self.horizon = horizon
 
         # INDLinUCB
@@ -49,7 +48,7 @@ class CLUB(Agent):
         self.nu = self.n_contexts
         # self.alpha = 4 * np.sqrt(d) # parameter for cut edge
         self.G = nx.gnp_random_graph(self.n_contexts, edge_probability)
-        self.clusters = {0: Cluster(users=range(
+        self.clusters = {0: Cluster(contexts=range(
             self.n_contexts), M=np.eye(self.arm_dim), b=np.zeros(self.arm_dim), N=0)}
         # index represents user, value is index of cluster he belongs to
         self.cluster_inds = np.zeros(self.n_contexts)
@@ -60,14 +59,14 @@ class CLUB(Agent):
         # get cluster of user i
         cluster_i = self.cluster_inds[context_i]
         cluster = self.clusters[cluster_i]
-        self.last_pull_i = cluster.pull_arm(self.arms, self.t)
-        self.a_hist.append(self.last_pull_i)
-        return self.last_pull_i
+        arm_i = cluster.pull_arm(self.arms, self.t)
+        self.a_hist.append(arm_i)
+        return self.arms[arm_i]
 
     def update_all(self, rewards):
-        for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
+        for arm, reward, c_i in zip(self.last_pulls, rewards, range(self.n_contexts)):
             # update weights
-            self.update(i=c_i, a=self.arms[arm_i], y=reward)
+            self.update(i=c_i, a=arm, y=reward)
         self.update_clustering(self.t)
         self.t += 1
 
@@ -100,8 +99,8 @@ class CLUB(Agent):
             for i in self.context_indexes:  # suppose there is only one user per round
                 C = nx.node_connected_component(self.G, i)
                 cluster_i = self.cluster_inds[i]
-                if len(C) < len(self.clusters[cluster_i].users):
-                    remain_users = set(self.clusters[cluster_i].users)
+                if len(C) < len(self.clusters[cluster_i].contexts):
+                    remain_users = set(self.clusters[cluster_i].contexts)
                     self.clusters[cluster_i] = Cluster(list(C), M=sum([self.M[k]-np.eye(self.arm_dim) for k in C])+np.eye(
                         self.arm_dim), b=sum([self.b[k] for k in C]), N=sum([self.num_pulls[k] for k in C]))
 

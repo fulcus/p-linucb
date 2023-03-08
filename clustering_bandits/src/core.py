@@ -40,10 +40,10 @@ class Core:
     def epoch(self, agent, environment, n_rounds=10):
         for _ in range(n_rounds):
             context_indexes = environment.get_contexts()
-            arms = agent.pull_arms(context_indexes)
+            arms = agent.pull_all(context_indexes)
             # arms: one row per context
             rewards = environment.round_all(arms)
-            agent.update_arms(rewards)
+            agent.update_all(rewards)
         if isinstance(agent, PartitionedAgent):
             return environment.rewards, agent.a_hist, agent.t_split, agent.agents_err_hist
         return environment.rewards, agent.a_hist

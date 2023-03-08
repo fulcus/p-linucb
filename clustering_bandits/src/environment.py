@@ -32,8 +32,8 @@ class ContextualLinearEnvironment:
         self.t += 1
         return obs_reward
 
-    def round(self, arm_i, x_i):
-        psi = self.psi(self.arms[arm_i], self.context_set[x_i])
+    def round(self, arm, x_i):
+        psi = self.psi(arm, self.context_set[x_i])
         obs_reward = (self.theta @ psi
                       + self.noise[self.t])
         return obs_reward
@@ -57,8 +57,10 @@ class PartitionedEnvironment(ContextualLinearEnvironment):
         self.k = k  # first k global components
         super().__init__(n_rounds, arms, context_set, theta, psi, sigma, random_state)
 
-    def round(self, arm_i, x_i):
-        arm = self.arms[arm_i]
+    def round(self, arm, x_i):
+        # arm = self.arms[arm_i]
+        if arm.shape[0] != 4:
+            print("arm.shape", arm.shape)
         obs_reward = (self.theta @ arm[:self.k]
                       + self.theta_p[x_i] @ arm[self.k:]
                       + self.noise[self.t, x_i])
