@@ -21,7 +21,7 @@ class ContextualLinearEnvironment:
         self.reset(random_state)
 
     def round_all(self, pulled_arms_i):
-        """computes reward for each context, action pair
+        """computes reward for each context, arm pair
         pulled_arms_i: row i contains arm j pulled for context i
         """
         obs_reward = np.zeros((self.n_contexts,))

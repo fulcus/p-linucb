@@ -18,20 +18,20 @@ class Core:
         err_hists = []
         if parallel:
             with ProcessPoolExecutor(max_workers=4) as executor:
-                for rews_epoch, actions_epoch in executor.map(self.helper, epoch_objs):
+                for rews_epoch, arms_epoch in executor.map(self.helper, epoch_objs):
                     rewards.append(rews_epoch)
-                    a_hists.append(actions_epoch)
+                    a_hists.append(arms_epoch)
         else:
             for args in epoch_objs:
                 if isinstance(args[0], PartitionedAgent):
-                    rews_epoch, actions_epoch, t_split, err_hist = self.helper(
+                    rews_epoch, arms_epoch, t_split, err_hist = self.helper(
                         args)
                     t_splits.append(t_split)
                     err_hists.append(err_hist)
                 else:
-                    rews_epoch, actions_epoch = self.helper(args)
+                    rews_epoch, arms_epoch = self.helper(args)
                 rewards.append(rews_epoch)
-                a_hists.append(actions_epoch)
+                a_hists.append(arms_epoch)
         return np.array(rewards), np.array(a_hists), np.array(t_splits), np.array(err_hists)
 
     def helper(self, args):
@@ -40,9 +40,9 @@ class Core:
     def epoch(self, agent, environment, n_rounds=10):
         for _ in range(n_rounds):
             context_indexes = environment.get_contexts()
-            actions = agent.pull_arms(context_indexes)
-            # actions: one row per context
-            rewards = environment.round_all(actions)
+            arms = agent.pull_arms(context_indexes)
+            # arms: one row per context
+            rewards = environment.round_all(arms)
             agent.update_arms(rewards)
         if isinstance(agent, PartitionedAgent):
             return environment.rewards, agent.a_hist, agent.t_split, agent.agents_err_hist

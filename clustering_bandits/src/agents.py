@@ -19,7 +19,7 @@ class Agent(ABC):
     def pull_arm(self, context_i):
         pass
 
-    def pull_arms(self, context_indexes):
+    def pull_all(self, context_indexes):
         for c_i in context_indexes:
             self.last_pulls_i[c_i] = self.pull_arm(c_i)
         return self.last_pulls_i
@@ -28,7 +28,7 @@ class Agent(ABC):
     def update(self, reward, *args, **kwargs):
         self.t += 1
 
-    def update_arms(self, rewards):
+    def update_all(self, rewards):
         for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
             self.update(reward, arm_i=arm_i, context_i=c_i)
 
@@ -212,12 +212,7 @@ class PartitionedAgent(INDLinUCBAgent):
         self.a_hist.append(arm_i)
         return arm_i
 
-    def _local_to_global_arm(self, arm_i_local):
-        subarm_local = self.arms_local[arm_i_local]
-        arm = np.concatenate([self.subarm_global, subarm_local])
-        return arm
-
-    def update_arms(self, rewards):
+    def update_all(self, rewards):
         arm_leader = None
         for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
             if self.subtheta_global is None:
@@ -262,3 +257,8 @@ class PartitionedAgent(INDLinUCBAgent):
             agent.b_vect = A_loc.T @ y_loc.T
             agent.V_t_inv = np.linalg.inv(agent.V_t)
             agent.theta_hat = agent.V_t_inv @ agent.b_vect
+
+    def _local_to_global_arm(self, arm_i_local):
+        subarm_local = self.arms_local[arm_i_local]
+        arm = np.concatenate([self.subarm_global, subarm_local])
+        return arm

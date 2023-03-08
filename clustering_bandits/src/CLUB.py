@@ -64,7 +64,7 @@ class CLUB(Agent):
         self.a_hist.append(self.last_pull_i)
         return self.last_pull_i
 
-    def update_arms(self, rewards):
+    def update_all(self, rewards):
         for arm_i, reward, c_i in zip(self.last_pulls_i, rewards, range(self.n_contexts)):
             # update weights
             self.update(i=c_i, a=self.arms[arm_i], y=reward)
