@@ -21,4 +21,4 @@ def save_heatmap(fpath, arms, context_set, theta, theta_p):
 def moving_average(arr, win=5):
     if len(arr) < win:
         return np.inf
-    return sum(arr[-win:]) / win
+    return np.mean(arr[-win:])
