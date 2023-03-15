@@ -108,7 +108,7 @@ class LinUCBAgent(Agent):
             arm_i = len(self.a_hist) % self.n_arms
         else:
             arm_i = self._estimate_linucb_arm()
-        self.a_hist.append(arm_i)
+        # self.a_hist.append(arm_i)
         return self.arms[arm_i]
 
     def update(self, reward, arm, *args, **kwargs):
@@ -119,7 +119,7 @@ class LinUCBAgent(Agent):
         self.V_t_inv = np.linalg.inv(self.V_t)
         self.theta_hat = self.V_t_inv @ self.b_vect
         # update hist
-        self.reward_hist.append(reward)
+        # self.reward_hist.append(reward)
         self.t += 1
 
     def _estimate_linucb_arm(self):
@@ -140,11 +140,11 @@ class INDLinUCBAgent(Agent):
     """One independent LinUCBAgent instance per context - BASELINE"""
 
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm_sum, max_arm_norm, sigma=1):
+                 max_theta_norm, max_arm_norm, sigma=1):
         super().__init__(arms, context_set)
         self.lmbd = lmbd
         self.horizon = horizon
-        self.max_theta_norm_sum = max_theta_norm_sum
+        self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
         self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
@@ -154,16 +154,18 @@ class INDLinUCBAgent(Agent):
                 self.context_set,
                 self.horizon,
                 self.lmbd,
-                self.max_theta_norm_sum,
+                self.max_theta_norm,
                 self.max_arm_norm,
                 self.sigma)
             for _ in range(self.n_contexts)
         ]
 
     def pull_arm(self, context_i):
-        arm = self.context_agent[context_i].pull_arm()
+        agent = self.context_agent[context_i]
+        arm = agent.pull_arm()
         arm_i = self.arm_index[tuple(arm)]
         self.a_hist.append(arm_i)
+        agent.a_hist.append(arm_i)
         return arm
 
     def update(self, reward, arm, context_i):
@@ -178,78 +180,88 @@ class PartitionedAgent(INDLinUCBAgent):
     the first k components of theta for all."""
 
     def __init__(self, arms, context_set, horizon, lmbd,
-                 max_theta_norm_sum, max_arm_norm, k=2, err_th=0.1, win=10, sigma=1):
+                 max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
         super().__init__(arms, context_set, horizon, lmbd,
-                         max_theta_norm_sum, max_arm_norm, sigma)
+                         max_theta_norm, max_arm_norm, sigma)
+        self.max_theta_norm_local = max_theta_norm_local
+        self.max_arm_norm_local = max_arm_norm_local
         self.k = k
         self.err_th = err_th
         self.win = win
 
         self.is_split = False
         self.t_split = None
+        self.leader_i = None
         self.reward_global = None
         self.subarm_global = None
-        self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
-        self.max_arm_norm_local = np.max(
-            [np.linalg.norm(a) for a in self.arms_local])
         self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
         self.agents_err_hist = [[] for _ in range(self.n_contexts)]
 
     def pull_arm(self, context_i):
-        arm = self.context_agent[context_i].pull_arm()
-        # if split has happened arm_i is index of second half
-        if self.is_split:
+        agent = self.context_agent[context_i]
+        arm = agent.pull_arm()
+        if self.is_split and context_i != self.leader_i:
             arm = np.concatenate([self.subarm_global, arm])
         arm_i = self.arm_index[tuple(arm)]
         self.a_hist.append(arm_i)
+        agent.a_hist.append(arm_i)
         return arm
 
     def update_all(self, rewards):
         arm_leader = None
         for arm, reward, c_i in zip(self.last_pulls, rewards, range(self.n_contexts)):
-            if self.is_split:
-                arm = arm[self.k:]
-                # remove global arm contribution to reward for local arm update 
-                pred_reward_local = self.context_agent[c_i].theta_hat.T @ arm
-                error = (reward - (self.reward_global + pred_reward_local)) ** 2
-                reward -= self.reward_global
-                self.agents_err_hist[c_i].append(error)
-            else:
-                pred_reward = self.context_agent[c_i].theta_hat.T @ arm
+            agent = self.context_agent[c_i]
+            agent.reward_hist.append(reward)
+            if not self.is_split or c_i == self.leader_i:
+                pred_reward = agent.theta_hat.T @ arm
                 error = (reward - pred_reward) ** 2
                 self.agents_err_hist[c_i].append(error)
                 if moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
-                    print(f"error={error.squeeze()}\n" +
-                          f"theta_hat={self.context_agent[c_i].theta_hat.squeeze()}\n" +
-                          f"{c_i_leader=}")
+                    #     print(f"t_split={self.t_split}")
+                    # print(f"error={error.squeeze()}\n" +
+                    #       f"theta_hat={agent.theta_hat.squeeze()}\n" +
+                    #       f"{c_i_leader=}")
+            else:
+                arm = arm[self.k:]
+                # remove global arm contribution to reward for local arm update
+                pred_reward_local = agent.theta_hat.T @ arm
+                error = (reward - (self.reward_global + pred_reward_local)) ** 2
+                self.agents_err_hist[c_i].append(error)
+                reward -= self.reward_global
             self.update(reward, arm, c_i)
-
         # recompute params at the end of round
         if arm_leader is not None:
-            self._split_agents_params(arm_leader, c_i_leader)
-            self.t_split = self.t
+            if self.t_split is None:
+                self.t_split = self.t
+
+            self.leader_i = c_i_leader
+            self.subtheta_global = self.context_agent[c_i_leader].theta_hat[:self.k]
+            print(f"t={self.t} theta_hat={self.subtheta_global.squeeze()}")
+            self.subarm_global = arm_leader[:self.k]
+            self.reward_global = self.subtheta_global.T @ self.subarm_global
+            self._split_agents_params()
             self.is_split = True
-            print(f"t_split={self.t_split}\n")
 
-    def _split_agents_params(self, arm, context_i):
-        subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
-        self.subarm_global = arm[:self.k]
-        self.reward_global = subtheta_global.T @ self.subarm_global
+    def _split_agents_params(self):
+        dim_local = self.arm_dim - self.k
+        arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
+        arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
 
-        for agent in self.context_agent:
+        for i, agent in enumerate(self.context_agent):
+            if i == self.leader_i:
+                continue
             # remove global components from all agents
-            agent.arm_dim -= self.k
+            agent.arm_dim = dim_local
             agent.max_arm_norm = self.max_arm_norm_local
-            agent.arms = self.arms_local
+            agent.max_theta_norm = self.max_theta_norm_local
+            agent.arms = arms_local
             # removing global components contributions
             y_loc = np.array(agent.reward_hist) - \
-                subtheta_global.T @ self.arms_global[agent.a_hist].T
-            A_loc = self.arms_local[agent.a_hist]
+                self.subtheta_global.T @ arms_global[agent.a_hist].T
+            A_loc = arms_local[agent.a_hist]
             # recompute bandit parameters
-            agent.V_t = A_loc.T @ A_loc + \
-                agent.lmbd * np.eye(agent.arm_dim)
+            agent.V_t = A_loc.T @ A_loc + agent.lmbd * np.eye(agent.arm_dim)
             agent.b_vect = A_loc.T @ y_loc.T
             agent.V_t_inv = np.linalg.inv(agent.V_t)
             agent.theta_hat = agent.V_t_inv @ agent.b_vect
