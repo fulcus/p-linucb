@@ -37,7 +37,7 @@ if __name__ == '__main__':
     k = 2  # global dim
     max_th = 3
     max_th_p = 1
-    max_a = 3
+    max_a = 1
     
     local_dim = arm_dim - k
 

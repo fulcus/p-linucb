@@ -1,7 +1,7 @@
 import numpy as np
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor
-from src.agents import PartitionedAgent
+from src.agents import *
 
 
 class Core:
@@ -23,7 +23,7 @@ class Core:
                     a_hists.append(arms_epoch)
         else:
             for args in epoch_objs:
-                if isinstance(args[0], PartitionedAgent):
+                if isinstance(args[0], PartitionedAgentStatic):
                     rews_epoch, arms_epoch, t_split, err_hist = self.helper(
                         args)
                     t_splits.append(t_split)
@@ -44,6 +44,6 @@ class Core:
             # arms: one row per context
             rewards = environment.round_all(arms)
             agent.update_all(rewards)
-        if isinstance(agent, PartitionedAgent):
+        if isinstance(agent, PartitionedAgentStatic) or isinstance(agent, PartitionedAgentDyn) or isinstance(agent, PartitionedAgentConstrDyn):
             return environment.rewards, agent.a_hist, agent.t_split, agent.agents_err_hist
         return environment.rewards, agent.a_hist

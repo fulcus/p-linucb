@@ -44,6 +44,7 @@ if __name__ == '__main__':
 
         logs = {}
         a_hists = {}
+        t_splits = {}
 
         env = PartitionedEnvironment(n_rounds=param_dict["horizon"],
                                      arms=param_dict["arms"],
@@ -83,25 +84,54 @@ if __name__ == '__main__':
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["context_set"],
             #              max_reward),
-            INDLinUCBAgent(param_dict["arms"],
-                           param_dict["context_set"],
-                           param_dict["horizon"],
-                           1,
-                           param_dict["max_theta_norm"],
-                           param_dict["max_arm_norm"],
-                           param_dict['sigma']),
-            PartitionedAgent(param_dict["arms"],
-                             param_dict["context_set"],
-                             param_dict["horizon"],
-                             1,
-                             param_dict["max_theta_norm"],
-                             param_dict["max_theta_norm_local"],
-                             param_dict["max_arm_norm"],
-                             param_dict["max_arm_norm_local"],
-                             k=param_dict["k"],
-                             err_th=1e-1,
-                             win=10,
-                             sigma=param_dict['sigma']),
+            INDLinUCBAgent(
+                param_dict["arms"],
+                param_dict["context_set"],
+                param_dict["horizon"],
+                1,
+                param_dict["max_theta_norm"],
+                param_dict["max_arm_norm"],
+                param_dict['sigma']),
+            PartitionedAgentStatic(
+                param_dict["arms"],
+                param_dict["context_set"],
+                param_dict["horizon"],
+                1,
+                param_dict["max_theta_norm"],
+                param_dict["max_theta_norm_local"],
+                param_dict["max_arm_norm"],
+                param_dict["max_arm_norm_local"],
+                k=param_dict["k"],
+                err_th=1e-1,
+                win=30,
+                sigma=param_dict['sigma']),
+            PartitionedAgentConstrDyn(
+                param_dict["arms"],
+                param_dict["context_set"],
+                param_dict["horizon"],
+                1,
+                param_dict["max_theta_norm"],
+                param_dict["max_theta_norm_local"],
+                param_dict["max_arm_norm"],
+                param_dict["max_arm_norm_local"],
+                k=param_dict["k"],
+                err_th=1e-1,
+                win=30,
+                sigma=param_dict['sigma']),
+            PartitionedAgentDyn(
+                param_dict["arms"],
+                param_dict["context_set"],
+                param_dict["horizon"],
+                1,
+                param_dict["max_theta_norm"],
+                param_dict["max_theta_norm_local"],
+                param_dict["max_arm_norm"],
+                param_dict["max_arm_norm_local"],
+                k=param_dict["k"],
+                err_th=1e-1,
+                win=30,
+                sigma=param_dict['sigma']),
+
             # CLUB(param_dict["arms"],
             #      param_dict["context_set"],
             #      param_dict["horizon"]),
@@ -111,8 +141,14 @@ if __name__ == '__main__':
         for agent in agents_list:
             agent_name = agent.__class__.__name__
             core = Core(env, agent)
-            if isinstance(agent, PartitionedAgent):
-                logs[agent_name], a_hists[agent_name], t_splits, err_hists = core.simulation(
+            if isinstance(agent, PartitionedAgentStatic):
+                # for w in [10, 20, 30, 50, 70, 100]:
+                #     agent_name = f"{agent.__class__.__name__}_{w}"
+                #     agent.win = w
+                #     core = Core(env, agent)
+                #     logs[agent_name], a_hists[agent_name], t_splits[agent_name], err_hists = core.simulation(
+                #         n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
+                logs[agent_name], a_hists[agent_name], t_splits[agent_name], err_hists = core.simulation(
                     n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
             else:
                 logs[agent_name], a_hists[agent_name], _, _ = core.simulation(
@@ -185,15 +221,16 @@ if __name__ == '__main__':
             # one plot per epoch
             for j in range(n_epochs):
                 ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
-                        label=f"{label} ep {j}", color=f'C{j+1}')
-                if label == "PartitionedAgent" and t_splits[j] is not None:
+                        label=f"{label} ep {j}", color=f'C{n_epochs+i+j+1}')
+                if label.startswith("PartitionedAgent") and t_splits[label][j] is not None:
                     ax.axvline(
-                        x=t_splits[j], color=f'C{j+1}', label=f'split time ep {j}')
-            # mean and std
-            ax.plot(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[
-                    x], label=f"{label} mean", color=f'C{i+n_epochs+1}')
-            ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
-                            np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
+                        x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')
+            if n_epochs > 1:
+                # mean and std
+                ax.plot(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[
+                        x], label=f"{label} mean", color=f'C{i+n_epochs+1}')
+                ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
+                                np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         ax.set_title('Cumulative Regret')

@@ -1,3 +1,4 @@
+*.txt
 plot.ipynb
 test/
 *.tex
