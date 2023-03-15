@@ -189,6 +189,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         self.err_th = err_th
         self.win = win
 
+        self.leader_i = None
         self.is_split = False
         self.t_split = None
         self.reward_global = None
@@ -254,7 +255,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
 
         for i, agent in enumerate(self.context_agent):
-            if i == self.leader_i:
+            if i == self.leader_i: # always false for static agent
                 continue
             # remove global components from all agents
             agent.arm_dim = dim_local
@@ -281,7 +282,6 @@ class PartitionedAgentConstrDyn(PartitionedAgentStatic):
                  max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
         super().__init__(arms, context_set, horizon, lmbd,
                          max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k, err_th, win, sigma)
-        self.leader_i = None
 
     def pull_arm(self, context_i):
         agent = self.context_agent[context_i]
@@ -339,7 +339,6 @@ class PartitionedAgentDyn(PartitionedAgentConstrDyn):
                  max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
         super().__init__(arms, context_set, horizon, lmbd,
                          max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k, err_th, win, sigma)
-        self.leader_i = None
 
     def update_all(self, rewards):
         arm_leader = None
