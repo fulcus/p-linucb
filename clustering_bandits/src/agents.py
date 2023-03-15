@@ -193,10 +193,11 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         self.t_split = None
         self.reward_global = None
         self.subarm_global = None
-        self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
-        self.max_arm_norm_local = np.max(
-            [np.linalg.norm(a) for a in self.arms_local])
+        self.subtheta_global = None
+        # self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
+        # self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
+        # self.max_arm_norm_local = np.max(
+        #     [np.linalg.norm(a) for a in self.arms_local])
         self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
         self.agents_err_hist = [[] for _ in range(self.n_contexts)]
 
@@ -217,41 +218,44 @@ class PartitionedAgentStatic(INDLinUCBAgent):
             agent = self.context_agent[c_i]
             agent.reward_hist.append(reward)
 
-            if self.is_split:
-                arm = arm[self.k:]
-                # remove global arm contribution to reward for local arm update
-                pred_reward_local = agent.theta_hat.T @ arm
-                error = (reward - (self.reward_global + pred_reward_local)) ** 2
-                reward -= self.reward_global
-                self.agents_err_hist[c_i].append(error)
-            else:
+            if not self.is_split:
                 pred_reward = agent.theta_hat.T @ arm
                 error = (reward - pred_reward) ** 2
                 self.agents_err_hist[c_i].append(error)
                 if moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
+                    # print(f"t_split={self.t_split}")
                     # print(f"error={error.squeeze()}\n" +
-                    #       f"theta_hat={self.context_agent[c_i].theta_hat.squeeze()}\n" +
+                    #       f"theta_hat={agent.theta_hat.squeeze()}\n" +
                     #       f"{c_i_leader=}")
+            else:
+                arm = arm[self.k:]
+                # remove global arm contribution to reward for local arm update
+                pred_reward_local = agent.theta_hat.T @ arm
+                error = (reward - (self.reward_global + pred_reward_local)) ** 2
+                self.agents_err_hist[c_i].append(error)
+                reward -= self.reward_global
             self.update(reward, arm, c_i)
 
         # recompute params at the end of round
         if arm_leader is not None:
-            self._split_agents_params(arm_leader, c_i_leader)
+            self.subtheta_global = self.context_agent[c_i_leader].theta_hat[:self.k]
+            self.subarm_global = arm[:self.k]
+            self.reward_global = self.subtheta_global.T @ self.subarm_global
+
+            self._split_agents_params()
             self.t_split = self.t
             self.is_split = True
             # print(f"t_split={self.t_split}\n")
 
-    def _split_agents_params(self, arm, context_i):
-        subtheta_global = self.context_agent[context_i].theta_hat[:self.k]
-        self.subarm_global = arm[:self.k]
-        self.reward_global = subtheta_global.T @ self.subarm_global
-
+    def _split_agents_params(self):
         dim_local = self.arm_dim - self.k
         arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
         arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
 
-        for agent in self.context_agent:
+        for i, agent in enumerate(self.context_agent):
+            if i == self.leader_i:
+                continue
             # remove global components from all agents
             agent.arm_dim = dim_local
             agent.max_arm_norm = self.max_arm_norm_local
@@ -259,17 +263,16 @@ class PartitionedAgentStatic(INDLinUCBAgent):
             agent.arms = arms_local
             # removing global components contributions
             y_loc = np.array(agent.reward_hist) - \
-                subtheta_global.T @ arms_global[agent.a_hist].T
+                self.subtheta_global.T @ arms_global[agent.a_hist].T
             A_loc = arms_local[agent.a_hist]
             # recompute bandit parameters
-            agent.V_t = A_loc.T @ A_loc + \
-                agent.lmbd * np.eye(agent.arm_dim)
+            agent.V_t = A_loc.T @ A_loc + agent.lmbd * np.eye(agent.arm_dim)
             agent.b_vect = A_loc.T @ y_loc.T
             agent.V_t_inv = np.linalg.inv(agent.V_t)
             agent.theta_hat = agent.V_t_inv @ agent.b_vect
 
 
-class PartitionedAgentConstrDyn(INDLinUCBAgent):
+class PartitionedAgentConstrDyn(PartitionedAgentStatic):
     """An independent linear bandit per context. 
     The first bandit that learns a good approximation of theta fixes 
     the first k components of theta for all."""
@@ -277,20 +280,8 @@ class PartitionedAgentConstrDyn(INDLinUCBAgent):
     def __init__(self, arms, context_set, horizon, lmbd,
                  max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
         super().__init__(arms, context_set, horizon, lmbd,
-                         max_theta_norm, max_arm_norm, sigma)
-        self.max_theta_norm_local = max_theta_norm_local
-        self.max_arm_norm_local = max_arm_norm_local
-        self.k = k
-        self.err_th = err_th
-        self.win = win
-
-        self.is_split = False
-        self.t_split = None
+                         max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k, err_th, win, sigma)
         self.leader_i = None
-        self.reward_global = None
-        self.subarm_global = None
-        self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
-        self.agents_err_hist = [[] for _ in range(self.n_contexts)]
 
     def pull_arm(self, context_i):
         agent = self.context_agent[context_i]
@@ -313,7 +304,7 @@ class PartitionedAgentConstrDyn(INDLinUCBAgent):
                 self.agents_err_hist[c_i].append(error)
                 if moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
-                    #     print(f"t_split={self.t_split}")
+                    # print(f"t_split={self.t_split}")
                     # print(f"error={error.squeeze()}\n" +
                     #       f"theta_hat={agent.theta_hat.squeeze()}\n" +
                     #       f"{c_i_leader=}")
@@ -338,30 +329,8 @@ class PartitionedAgentConstrDyn(INDLinUCBAgent):
             self._split_agents_params()
             self.is_split = True
 
-    def _split_agents_params(self):
-        dim_local = self.arm_dim - self.k
-        arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
 
-        for i, agent in enumerate(self.context_agent):
-            if i == self.leader_i:
-                continue
-            # remove global components from all agents
-            agent.arm_dim = dim_local
-            agent.max_arm_norm = self.max_arm_norm_local
-            agent.max_theta_norm = self.max_theta_norm_local
-            agent.arms = arms_local
-            # removing global components contributions
-            y_loc = np.array(agent.reward_hist) - \
-                self.subtheta_global.T @ arms_global[agent.a_hist].T
-            A_loc = arms_local[agent.a_hist]
-            # recompute bandit parameters
-            agent.V_t = A_loc.T @ A_loc + agent.lmbd * np.eye(agent.arm_dim)
-            agent.b_vect = A_loc.T @ y_loc.T
-            agent.V_t_inv = np.linalg.inv(agent.V_t)
-            agent.theta_hat = agent.V_t_inv @ agent.b_vect
-
-class PartitionedAgentDyn(INDLinUCBAgent):
+class PartitionedAgentDyn(PartitionedAgentConstrDyn):
     """An independent linear bandit per context. 
     The first bandit that learns a good approximation of theta fixes 
     the first k components of theta for all."""
@@ -369,30 +338,8 @@ class PartitionedAgentDyn(INDLinUCBAgent):
     def __init__(self, arms, context_set, horizon, lmbd,
                  max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
         super().__init__(arms, context_set, horizon, lmbd,
-                         max_theta_norm, max_arm_norm, sigma)
-        self.max_theta_norm_local = max_theta_norm_local
-        self.max_arm_norm_local = max_arm_norm_local
-        self.k = k
-        self.err_th = err_th
-        self.win = win
-
-        self.is_split = False
-        self.t_split = None
+                         max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k, err_th, win, sigma)
         self.leader_i = None
-        self.reward_global = None
-        self.subarm_global = None
-        self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
-        self.agents_err_hist = [[] for _ in range(self.n_contexts)]
-
-    def pull_arm(self, context_i):
-        agent = self.context_agent[context_i]
-        arm = agent.pull_arm()
-        if self.is_split and context_i != self.leader_i:
-            arm = np.concatenate([self.subarm_global, arm])
-        arm_i = self.arm_index[tuple(arm)]
-        self.a_hist.append(arm_i)
-        agent.a_hist.append(arm_i)
-        return arm
 
     def update_all(self, rewards):
         arm_leader = None
@@ -405,7 +352,8 @@ class PartitionedAgentDyn(INDLinUCBAgent):
                 self.agents_err_hist[c_i].append(error)
                 if moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
-                    #     print(f"t_split={self.t_split}")
+                    self.leader_i = c_i_leader
+                    # print(f"t_split={self.t_split}")
                     # print(f"error={error.squeeze()}\n" +
                     #       f"theta_hat={agent.theta_hat.squeeze()}\n" +
                     #       f"{c_i_leader=}")
@@ -418,37 +366,12 @@ class PartitionedAgentDyn(INDLinUCBAgent):
                 reward -= self.reward_global
             self.update(reward, arm, c_i)
         # recompute params at the end of round
-        if arm_leader is not None or self.leader_i is not None:
+        if self.leader_i is not None:
             if self.t_split is None:
                 self.t_split = self.t
-
-            self.leader_i = c_i_leader
             self.subtheta_global = self.context_agent[c_i_leader].theta_hat[:self.k]
             # print(f"t={self.t} theta_hat={self.subtheta_global.squeeze()}")
             self.subarm_global = arm_leader[:self.k]
             self.reward_global = self.subtheta_global.T @ self.subarm_global
             self._split_agents_params()
             self.is_split = True
-
-    def _split_agents_params(self):
-        dim_local = self.arm_dim - self.k
-        arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
-
-        for i, agent in enumerate(self.context_agent):
-            if i == self.leader_i:
-                continue
-            # remove global components from all agents
-            agent.arm_dim = dim_local
-            agent.max_arm_norm = self.max_arm_norm_local
-            agent.max_theta_norm = self.max_theta_norm_local
-            agent.arms = arms_local
-            # removing global components contributions
-            y_loc = np.array(agent.reward_hist) - \
-                self.subtheta_global.T @ arms_global[agent.a_hist].T
-            A_loc = arms_local[agent.a_hist]
-            # recompute bandit parameters
-            agent.V_t = A_loc.T @ A_loc + agent.lmbd * np.eye(agent.arm_dim)
-            agent.b_vect = A_loc.T @ y_loc.T
-            agent.V_t_inv = np.linalg.inv(agent.V_t)
-            agent.theta_hat = agent.V_t_inv @ agent.b_vect
