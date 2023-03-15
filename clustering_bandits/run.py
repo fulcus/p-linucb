@@ -50,7 +50,7 @@ if __name__ == '__main__':
                                      context_set=param_dict["context_set"],
                                      theta=param_dict["theta"],
                                      theta_p=param_dict["theta_p"],
-                                     k=param_dict["split_dim"],
+                                     k=param_dict["k"],
                                      sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
                             context_set=param_dict["context_set"],
                             theta=param_dict["theta"],
                             theta_p=param_dict["theta_p"],
-                            k=param_dict["split_dim"])
+                            k=param_dict["k"])
         core = Core(env, agent)
         # rewards, arms
         clairvoyant_logs, a_hists['Clairvoyant'], _, _ = core.simulation(
@@ -77,7 +77,7 @@ if __name__ == '__main__':
             #             param_dict["context_set"],
             #             param_dict["horizon"],
             #             1,
-            #             param_dict["max_theta_norm_sum"],
+            #             param_dict["max_theta_norm_shared"] + param_dict["max_theta_norm_p"],
             #             param_dict["max_arm_norm"],
             #             param_dict['sigma']),
             # INDUCB1Agent(param_dict["arms"],
@@ -87,22 +87,24 @@ if __name__ == '__main__':
                            param_dict["context_set"],
                            param_dict["horizon"],
                            1,
-                           param_dict["max_theta_norm_sum"],
+                           param_dict["max_theta_norm"],
                            param_dict["max_arm_norm"],
                            param_dict['sigma']),
             PartitionedAgent(param_dict["arms"],
                              param_dict["context_set"],
                              param_dict["horizon"],
                              1,
-                             param_dict["max_theta_norm_sum"],
+                             param_dict["max_theta_norm"],
+                             param_dict["max_theta_norm_local"],
                              param_dict["max_arm_norm"],
-                             k=param_dict["split_dim"],
+                             param_dict["max_arm_norm_local"],
+                             k=param_dict["k"],
                              err_th=1e-1,
                              win=10,
                              sigma=param_dict['sigma']),
-            CLUB(param_dict["arms"],
-                 param_dict["context_set"],
-                 param_dict["horizon"]),
+            # CLUB(param_dict["arms"],
+            #      param_dict["context_set"],
+            #      param_dict["horizon"]),
         ]
 
         # Train all agents
@@ -130,7 +132,6 @@ if __name__ == '__main__':
             for i in range(param_dict['n_epochs']):
                 regret[label][i, :] = clairvoyant_logs[i, :] - \
                     logs[label][i, :]
-
 
         # inst reward, inst regret and cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+1, step=250)
@@ -201,11 +202,13 @@ if __name__ == '__main__':
         # tikz.save(out_folder + f"tex/{testcase_id}_regret.tex")
         plt.savefig(testcase_dir + "regret.png")
 
-        # Error plot
+        # Error plots
+        """
         if err_hists.any():
             # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
-            n_epochs = err_hists.shape[0]
+            # n_epochs = err_hists.shape[0]
             n_contexts = err_hists.shape[1]
+            
             err_logs = {}  # epoch: context: [errors at each timestep]
             # by epoch
             for i in range(n_epochs):
@@ -216,7 +219,8 @@ if __name__ == '__main__':
                     ax.plot(x, err_hists[i, j][x],
                             label=f"c_{j}", color=f'C{j+1}')
                     if label == "PartitionedAgent" and t_splits[i] is not None:
-                        ax.axvline(x=t_splits[i], color=f'C{i+1}', label=f'split time')
+                        ax.axvline(
+                            x=t_splits[i], color=f'C{i+1}', label=f'split time')
 
                 ax.set_xlim(left=0)
                 ax.set_ylim(bottom=0)
@@ -241,33 +245,33 @@ if __name__ == '__main__':
                 ax.set_title(f'Squared Error, Context {j}')
                 ax.legend()
                 plt.savefig(testcase_dir + f"err_c_{j}.png")
+        """
+        # logging
+        final_logs[f'{testcase}'] = {label: np.mean(
+            np.sum(regret[label].T, axis=0)) for label in regret.keys()}
 
-            # logging
-            final_logs[f'{testcase}'] = {label: np.mean(
-                np.sum(regret[label].T, axis=0)) for label in regret.keys()}
+        # arm history plots
+        n_arms = param_dict["n_arms"]
+        f, ax = plt.subplots(3, 2, figsize=(20, 30))
 
-            # arm history plots
-            n_arms = param_dict["n_arms"]
+        for ax_, label in zip(f.axes, a_hists.keys()):
+            bins = np.arange(n_arms+1) - 0.5
+            ax_.hist(a_hists[label].flatten(), bins=bins)
+            ax_.set_xticks(range(n_arms))
+            ax_.set_xlim(-1, n_arms)
+            ax_.set_title(label)
+
+            # tikz.save(out_dir + f"tex/{testcase}_a_hist.tex")
+            plt.savefig(testcase_dir + f"a_hist.png")
+
             f, ax = plt.subplots(3, 2, figsize=(20, 30))
-
             for ax_, label in zip(f.axes, a_hists.keys()):
                 bins = np.arange(n_arms+1) - 0.5
-                ax_.hist(a_hists[label].flatten(), bins=bins)
-                ax_.set_xticks(range(n_arms))
-                ax_.set_xlim(-1, n_arms)
+                ax_.plot(a_hists[label][-1, :])
                 ax_.set_title(label)
 
-                # tikz.save(out_dir + f"tex/{testcase}_a_hist.tex")
-                plt.savefig(testcase_dir + f"a_hist.png")
-
-                f, ax = plt.subplots(3, 2, figsize=(20, 30))
-                for ax_, label in zip(f.axes, a_hists.keys()):
-                    bins = np.arange(n_arms+1) - 0.5
-                    ax_.plot(a_hists[label][-1, :])
-                    ax_.set_title(label)
-
-                # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
-                plt.savefig(testcase_dir + f"a_hist_temp.png")
+            # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
+            plt.savefig(testcase_dir + f"a_hist_temp.png")
 
     with open(out_dir + f"logs.json", "w") as f:
         json.dump(final_logs, f, indent=4)

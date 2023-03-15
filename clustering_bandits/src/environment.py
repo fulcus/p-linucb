@@ -23,13 +23,13 @@ class Environment(ABC):
         """computes reward for each context, arm pair
             pulled_arms_i: row i contains arm j pulled for context i
         """
-        obs_reward = np.zeros((self.n_contexts,))
+        obs_rewards = np.zeros((self.n_contexts,))
         for x_i, a_j in enumerate(pulled_arms_i):
-            obs_reward[x_i] = self.round(a_j, x_i)
+            obs_rewards[x_i] = self.round(a_j, x_i)
         # logging sum of rewards
-        self.rewards = np.append(self.rewards, obs_reward.sum())
+        self.rewards = np.append(self.rewards, obs_rewards.sum())
         self.t += 1
-        return obs_reward
+        return obs_rewards
 
     @abstractmethod
     def round(self, arm, x_i):

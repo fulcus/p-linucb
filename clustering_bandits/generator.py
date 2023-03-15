@@ -4,6 +4,7 @@ import os
 import numpy as np
 import itertools
 import math
+from src.utils import *
 
 
 def onehot_arms(dim_arm):
@@ -15,8 +16,8 @@ def random_arms(n_arms, dim_arm, seed):
     return np.random.randint(0, 100, (n_arms, dim_arm)).tolist()
 
 
-def vertex_arms(dim_arm, arm_norm):
-    tuples = [(-arm_norm, arm_norm) for _ in range(dim_arm)]
+def vertex_arms(dim_arm, max_a):
+    tuples = [(-max_a, max_a) for _ in range(dim_arm)]
     arms = [a for a in itertools.product(*tuples)]
     return arms
 
@@ -33,12 +34,15 @@ if __name__ == '__main__':
     n_contexts = 10
     arm_dim = 4
     ctx_dim = 3
-    # split_dim = arm_dim * ctx_dim
-    split_dim = 2
+    k = 2  # global dim
+    max_th = 3
+    max_th_p = 1
+    max_a = 3
+    
+    local_dim = arm_dim - k
 
     if args.arm == 'v':
-        arm_coord_norm = 1
-        arms = vertex_arms(arm_dim, arm_coord_norm)
+        arms = vertex_arms(arm_dim, max_a)
         n_arms = len(arms)
     elif args.arm == 'o':
         arms = onehot_arms(arm_dim)
@@ -47,23 +51,17 @@ if __name__ == '__main__':
         n_arms = 5
         arms = random_arms(n_arms, arm_dim, args.seed)
 
-    
-    # max local norm < 3.5
-    # max_arm_norm = math.ceil(np.linalg.norm(np.outer([1, 1, 1, 1], [1, 1, 1])))
-    # max global norm == 2 == np.linalg.norm([1, 1, 1, 1])
-    
-    max_arm_norm = math.ceil(np.max([np.linalg.norm(a) for a in arms]))
-
     np.random.seed(args.seed)
-    theta = np.random.uniform(-3.0, 3.0, size=(1, split_dim)).round(2).tolist()
+    theta = np.random.uniform(-max_th, max_th, size=(1, k)).round(2).tolist()
     np.random.seed(args.seed)
-    theta_p = np.random.uniform(-1.0, 1.0, size=(n_contexts, split_dim))
+    theta_p = np.random.uniform(-max_th_p, max_th_p, size=(n_contexts, local_dim))
     theta_p = theta_p.round(2).tolist()
 
     # only valid for v arms
-    max_theta_norm_shared = math.ceil(math.sqrt(arm_dim) * 3)
-    max_theta_norm_p = math.ceil(math.sqrt(arm_dim) * 1)
-    max_theta_norm_sum = math.ceil(math.sqrt(arm_dim) * 4)
+    max_theta_norm = vector_norm_bound(max_th, arm_dim)
+    max_theta_norm_local = vector_norm_bound(max_th, local_dim)
+    max_arm_norm = vector_norm_bound(max_a, arm_dim)
+    max_arm_norm_local = vector_norm_bound(max_a, local_dim)
 
     np.random.seed(args.seed)
     context_set = np.random.uniform(0.0, 1.0, size=(n_contexts, ctx_dim))
@@ -75,11 +73,11 @@ if __name__ == '__main__':
         "sigma": 0.1,
         "seed": args.seed,
         "n_arms": n_arms,
-        "split_dim": split_dim,
+        "k": k,
         "max_arm_norm": max_arm_norm,
-        "max_theta_norm_sum": max_theta_norm_sum,
-        "max_theta_norm_shared": max_theta_norm_shared,
-        "max_theta_norm_p": max_theta_norm_p,
+        "max_arm_norm_local": max_arm_norm_local,
+        "max_theta_norm": max_theta_norm,
+        "max_theta_norm_local": max_theta_norm_local,
         "arms": arms,
         "theta": theta,
         "context_set": context_set,
