@@ -12,15 +12,17 @@ class Agent(ABC):
         self.arm_dim = arms.shape[1]
         self.t = 0
         self.a_hist = []
-        self.last_pulls = [[] for _ in range(self.n_contexts)]
+        self.last_pulls = []
 
     @abstractmethod
     def pull_arm(self, context_i):
         pass
 
-    def pull_all(self, context_indexes):
-        for c_i in context_indexes:
-            self.last_pulls[c_i] = self.pull_arm(c_i)
+    def pull_all(self, indexes):
+        self.last_pulls = []
+        self.curr_indexes = indexes
+        for c_i in self.curr_indexes:
+            self.last_pulls.append(self.pull_arm(c_i))
         return self.last_pulls
 
     @abstractmethod
@@ -28,7 +30,7 @@ class Agent(ABC):
         self.t += 1
 
     def update_all(self, rewards):
-        for arm, reward, c_i in zip(self.last_pulls, rewards, range(self.n_contexts)):
+        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
             self.update(reward, arm=arm, context_i=c_i)
 
 
@@ -215,7 +217,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
 
     def update_all(self, rewards):
         arm_leader = None
-        for arm, reward, c_i in zip(self.last_pulls, rewards, range(self.n_contexts)):
+        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
             agent = self.context_agent[c_i]
             agent.reward_hist.append(reward)
 
@@ -223,12 +225,12 @@ class PartitionedAgentStatic(INDLinUCBAgent):
                 pred_reward = agent.theta_hat.T @ arm
                 error = (reward - pred_reward) ** 2
                 self.agents_err_hist[c_i].append(error)
-                if moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
+                if arm_leader is None and moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
-                    # print(f"t_split={self.t_split}")
-                    # print(f"error={error.squeeze()}\n" +
-                    #       f"theta_hat={agent.theta_hat.squeeze()}\n" +
-                    #       f"{c_i_leader=}")
+                    print(f"t_split={self.t_split}")
+                    print(f"error={error.squeeze()}\n" +
+                          f"theta_hat={agent.theta_hat.squeeze()}\n" +
+                          f"{c_i_leader=}")
             else:
                 arm = arm[self.k:]
                 # remove global arm contribution to reward for local arm update
@@ -241,7 +243,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         # recompute params at the end of round
         if arm_leader is not None:
             self.subtheta_global = self.context_agent[c_i_leader].theta_hat[:self.k]
-            self.subarm_global = arm[:self.k]
+            self.subarm_global = arm_leader[:self.k]
             self.reward_global = self.subtheta_global.T @ self.subarm_global
 
             self._split_agents_params()
@@ -255,7 +257,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
 
         for i, agent in enumerate(self.context_agent):
-            if i == self.leader_i: # always false for static agent
+            if i == self.leader_i:  # always false for static agent
                 continue
             # remove global components from all agents
             agent.arm_dim = dim_local
@@ -295,7 +297,7 @@ class PartitionedAgentConstrDyn(PartitionedAgentStatic):
 
     def update_all(self, rewards):
         arm_leader = None
-        for arm, reward, c_i in zip(self.last_pulls, rewards, range(self.n_contexts)):
+        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
             agent = self.context_agent[c_i]
             agent.reward_hist.append(reward)
             if not self.is_split or c_i == self.leader_i:
@@ -342,7 +344,7 @@ class PartitionedAgentDyn(PartitionedAgentConstrDyn):
 
     def update_all(self, rewards):
         arm_leader = None
-        for arm, reward, c_i in zip(self.last_pulls, rewards, range(self.n_contexts)):
+        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
             agent = self.context_agent[c_i]
             agent.reward_hist.append(reward)
             if not self.is_split or c_i == self.leader_i:
