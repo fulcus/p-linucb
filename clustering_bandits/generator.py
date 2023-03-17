@@ -38,7 +38,7 @@ if __name__ == '__main__':
     max_th = 3
     max_th_p = 1
     max_a = 1
-    
+
     local_dim = arm_dim - k
 
     if args.arm == 'v':
@@ -54,7 +54,8 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
     theta = np.random.uniform(-max_th, max_th, size=(1, k)).round(2).tolist()
     np.random.seed(args.seed)
-    theta_p = np.random.uniform(-max_th_p, max_th_p, size=(n_contexts, local_dim))
+    theta_p = np.random.uniform(-max_th_p, max_th_p,
+                                size=(n_contexts, local_dim))
     theta_p = theta_p.round(2).tolist()
 
     # only valid for v arms
@@ -63,16 +64,13 @@ if __name__ == '__main__':
     max_arm_norm = vector_norm_bound(max_a, arm_dim)
     max_arm_norm_local = vector_norm_bound(max_a, local_dim)
 
-    np.random.seed(args.seed)
-    context_set = np.random.uniform(0.0, 1.0, size=(n_contexts, ctx_dim))
-    context_set = context_set.round(2).tolist()
-
     params = {
         "horizon": 5000,
         "n_epochs": 1,
         "sigma": 0.1,
         "seed": args.seed,
         "n_arms": n_arms,
+        "n_contexts": n_contexts,
         "k": k,
         "max_arm_norm": max_arm_norm,
         "max_arm_norm_local": max_arm_norm_local,
@@ -80,7 +78,6 @@ if __name__ == '__main__':
         "max_theta_norm_local": max_theta_norm_local,
         "arms": arms,
         "theta": theta,
-        "context_set": context_set,
         "theta_p": theta_p
     }
 

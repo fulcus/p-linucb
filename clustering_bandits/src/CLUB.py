@@ -30,8 +30,8 @@ class Cluster:
 
 class CLUB(Agent):
     # random_init: use random initialization or not
-    def __init__(self, arms, context_set, horizon, edge_probability=1):
-        super().__init__(arms, context_set)
+    def __init__(self, arms, n_contexts, horizon, edge_probability=1):
+        super().__init__(arms, n_contexts)
         self.context_indexes = range(self.n_contexts)
         self.horizon = horizon
 

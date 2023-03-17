@@ -4,18 +4,17 @@ from abc import ABC, abstractmethod
 
 class Environment(ABC):
 
-    def __init__(self, n_rounds, arms, context_set, theta, sigma=0.01, random_state=1):
+    def __init__(self, n_rounds, arms, n_contexts, theta, sigma=0.01, random_state=1):
         self.n_rounds = n_rounds
         self.arms = arms
         self.theta = theta
-        self.context_set = context_set
+        self.n_contexts = n_contexts
         self.sigma = sigma
         self.random_state = random_state
 
         self.t = None
         self.noise = None
         self.rewards = np.array([])
-        self.n_contexts = self.context_set.shape[0]
         self.context_indexes = np.arange(self.n_contexts)
         self.reset(0)
 
@@ -60,8 +59,8 @@ class Environment(ABC):
 class PartitionedEnvironment(Environment):
     """exp_reward = theta * arm[:k] + theta_p[context] * arm[k:]"""
 
-    def __init__(self, n_rounds, arms, context_set, theta, theta_p, k, sigma=0.01, random_state=1):
-        super().__init__(n_rounds, arms, context_set, theta, sigma, random_state)
+    def __init__(self, n_rounds, arms, n_contexts, theta, theta_p, k, sigma=0.01, random_state=1):
+        super().__init__(n_rounds, arms, n_contexts, theta, sigma, random_state)
         self.theta_p = theta_p
         self.k = k  # first k global components
 

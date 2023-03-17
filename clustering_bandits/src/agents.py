@@ -4,10 +4,9 @@ from src.utils import moving_average
 
 
 class Agent(ABC):
-    def __init__(self, arms, context_set):
+    def __init__(self, arms, n_contexts):
         self.arms = arms
-        self.context_set = context_set
-        self.n_contexts = context_set.shape[0]
+        self.n_contexts = n_contexts
         self.n_arms = arms.shape[0]
         self.arm_dim = arms.shape[1]
         self.t = 0
@@ -37,8 +36,8 @@ class Agent(ABC):
 class Clairvoyant(Agent):
     """Always pulls the optimal arm"""
 
-    def __init__(self, arms, context_set, theta, theta_p, k):
-        super().__init__(arms, context_set)
+    def __init__(self, arms, n_contexts, theta, theta_p, k):
+        super().__init__(arms, n_contexts)
         self.theta = theta
         self.theta_p = theta_p
         self.k = k
@@ -57,8 +56,8 @@ class Clairvoyant(Agent):
 
 
 class UCB1Agent(Agent):
-    def __init__(self, arms, context_set, max_reward=1):
-        super().__init__(arms, context_set)
+    def __init__(self, arms, n_contexts, max_reward=1):
+        super().__init__(arms, n_contexts)
         self.max_reward = max_reward
         self.avg_reward = np.ones(self.n_arms) * np.inf
         self.n_pulls = np.zeros(self.n_arms)
@@ -87,9 +86,9 @@ class UCB1Agent(Agent):
 
 
 class LinUCBAgent(Agent):
-    def __init__(self, arms, context_set, horizon, lmbd,
+    def __init__(self, arms, n_contexts, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma=1):
-        super().__init__(arms, context_set)
+        super().__init__(arms, n_contexts)
         assert lmbd > 0
         self.lmbd = lmbd
         self.horizon = horizon
@@ -141,9 +140,9 @@ class LinUCBAgent(Agent):
 class INDLinUCBAgent(Agent):
     """One independent LinUCBAgent instance per context - BASELINE"""
 
-    def __init__(self, arms, context_set, horizon, lmbd,
+    def __init__(self, arms, n_contexts, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma=1):
-        super().__init__(arms, context_set)
+        super().__init__(arms, n_contexts)
         self.lmbd = lmbd
         self.horizon = horizon
         self.max_theta_norm = max_theta_norm
@@ -153,7 +152,7 @@ class INDLinUCBAgent(Agent):
         self.context_agent = [
             LinUCBAgent(
                 self.arms,
-                self.context_set,
+                self.n_contexts,
                 self.horizon,
                 self.lmbd,
                 self.max_theta_norm,
@@ -181,9 +180,9 @@ class PartitionedAgentStatic(INDLinUCBAgent):
     The first bandit that learns a good approximation of theta fixes 
     the first k components of theta for all."""
 
-    def __init__(self, arms, context_set, horizon, lmbd,
+    def __init__(self, arms, n_contexts, horizon, lmbd,
                  max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
-        super().__init__(arms, context_set, horizon, lmbd,
+        super().__init__(arms, n_contexts, horizon, lmbd,
                          max_theta_norm, max_arm_norm, sigma)
         self.max_theta_norm_local = max_theta_norm_local
         self.max_arm_norm_local = max_arm_norm_local
@@ -227,7 +226,6 @@ class PartitionedAgentStatic(INDLinUCBAgent):
                 self.agents_err_hist[c_i].append(error)
                 if arm_leader is None and moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
-                    print(f"t_split={self.t_split}")
                     print(f"error={error.squeeze()}\n" +
                           f"theta_hat={agent.theta_hat.squeeze()}\n" +
                           f"{c_i_leader=}")
@@ -248,6 +246,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
 
             self._split_agents_params()
             self.t_split = self.t
+            print(f"t_split={self.t_split}")
             self.is_split = True
             # print(f"t_split={self.t_split}\n")
 
@@ -280,9 +279,9 @@ class PartitionedAgentConstrDyn(PartitionedAgentStatic):
     The first bandit that learns a good approximation of theta fixes 
     the first k components of theta for all."""
 
-    def __init__(self, arms, context_set, horizon, lmbd,
+    def __init__(self, arms, n_contexts, horizon, lmbd,
                  max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
-        super().__init__(arms, context_set, horizon, lmbd,
+        super().__init__(arms, n_contexts, horizon, lmbd,
                          max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k, err_th, win, sigma)
 
     def pull_arm(self, context_i):
@@ -337,9 +336,9 @@ class PartitionedAgentDyn(PartitionedAgentConstrDyn):
     The first bandit that learns a good approximation of theta fixes 
     the first k components of theta for all."""
 
-    def __init__(self, arms, context_set, horizon, lmbd,
+    def __init__(self, arms, n_contexts, horizon, lmbd,
                  max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k=2, err_th=0.1, win=10, sigma=1):
-        super().__init__(arms, context_set, horizon, lmbd,
+        super().__init__(arms, n_contexts, horizon, lmbd,
                          max_theta_norm, max_theta_norm_local, max_arm_norm, max_arm_norm_local, k, err_th, win, sigma)
 
     def update_all(self, rewards):
