@@ -31,6 +31,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--arm', choices=['v', 'o', 'r'], default='v')
     args = parser.parse_args()
 
+    lmbd = 1
     n_contexts = 10
     arm_dim = 4
     ctx_dim = 3
@@ -72,13 +73,14 @@ if __name__ == '__main__':
         "n_arms": n_arms,
         "n_contexts": n_contexts,
         "k": k,
+        "lmbd": lmbd,
         "max_arm_norm": max_arm_norm,
         "max_arm_norm_local": max_arm_norm_local,
         "max_theta_norm": max_theta_norm,
         "max_theta_norm_local": max_theta_norm_local,
-        "arms": arms,
         "theta": theta,
-        "theta_p": theta_p
+        "theta_p": theta_p,
+        "arms": arms,
     }
 
     filename = f"{args.arm}_{args.seed}.json"

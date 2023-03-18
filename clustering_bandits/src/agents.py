@@ -223,7 +223,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
             if not self.is_split:
                 pred_reward = agent.theta_hat.T @ arm
                 # error = (reward - pred_reward) ** 2
-                error = abs(reward - pred_reward) / reward
+                error = abs((reward - pred_reward) / reward)
                 self.agents_err_hist[c_i].append(error)
                 if arm_leader is None and moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
@@ -231,7 +231,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
                           f"theta_hat={agent.theta_hat.squeeze()}\n" +
                           f"{c_i_leader=}\n" +
                           f"{self.t=}")
-                    
+
             else:
                 arm = arm[self.k:]
                 # remove global arm contribution to reward for local arm update

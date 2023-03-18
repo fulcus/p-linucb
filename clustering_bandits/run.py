@@ -9,7 +9,6 @@ import argparse
 import warnings
 import json
 import os
-import time
 
 os.environ['PYTHONWARNINGS'] = 'ignore::RuntimeWarning'
 
@@ -30,7 +29,6 @@ if __name__ == '__main__':
     test_files = os.listdir(
         in_dir) if args.test_file is None else [args.test_file]
 
-    start_all_time = start_time = time.time()
     for testcase in test_files:
         print(f'############## {testcase} ##############')
 
@@ -63,10 +61,9 @@ if __name__ == '__main__':
                             k=param_dict["k"])
         core = Core(env, agent)
         # rewards, arms
+        print(f"Clairvoyant")
         clairvoyant_logs, a_hists['Clairvoyant'], _, _ = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
-        print(f"Clairvoyant - {time.time() - start_time:.2f}s")
-        start_time = time.time()
         # Reward upper bound
         max_reward = clairvoyant_logs.max()
 
@@ -77,7 +74,7 @@ if __name__ == '__main__':
             # LinUCBAgent(param_dict["arms"],
             #             param_dict["n_contexts"],
             #             param_dict["horizon"],
-            #             1,
+            #             param_dict["lmbd"],
             #             param_dict["max_theta_norm_shared"] + param_dict["max_theta_norm_p"],
             #             param_dict["max_arm_norm"],
             #             param_dict['sigma']),
@@ -88,7 +85,7 @@ if __name__ == '__main__':
                 param_dict["arms"],
                 param_dict["n_contexts"],
                 param_dict["horizon"],
-                1,
+                param_dict["lmbd"],
                 param_dict["max_theta_norm"],
                 param_dict["max_arm_norm"],
                 param_dict['sigma']),
@@ -96,13 +93,13 @@ if __name__ == '__main__':
                 param_dict["arms"],
                 param_dict["n_contexts"],
                 param_dict["horizon"],
-                1,
+                param_dict["lmbd"],
                 param_dict["max_theta_norm"],
                 param_dict["max_theta_norm_local"],
                 param_dict["max_arm_norm"],
                 param_dict["max_arm_norm_local"],
                 k=param_dict["k"],
-                err_th=1e-2,
+                err_th=0.01,
                 win=30,
                 sigma=param_dict['sigma']),
             # CLUB(param_dict["arms"],
@@ -113,6 +110,7 @@ if __name__ == '__main__':
         # Train all agents
         for agent in agents_list:
             agent_name = agent.__class__.__name__
+            print(agent_name)
             core = Core(env, agent)
             if isinstance(agent, PartitionedAgentStatic):
                 # for w in [10, 20, 30, 50, 70, 100]:
@@ -126,10 +124,6 @@ if __name__ == '__main__':
             else:
                 logs[agent_name], a_hists[agent_name], _, _ = core.simulation(
                     n_epochs=param_dict["n_epochs"], n_rounds=param_dict["horizon"])
-
-            print(f"{agent_name} - {time.time() - start_time:.2f}s")
-            start_time = time.time()
-        print(f"Total training {time.time() - start_all_time:.2f}s")
 
         # Regrets computing
         print('Computing regrets...')
