@@ -45,5 +45,5 @@ class Core:
             rewards = environment.round_all(arms)
             agent.update_all(rewards)
         if isinstance(agent, PartitionedAgentStatic):
-            return environment.rewards, agent.a_hist, agent.t_split, agent.agents_err_hist
+            return environment.rewards, agent.a_hist, agent.t_split, agent.err_hist
         return environment.rewards, agent.a_hist

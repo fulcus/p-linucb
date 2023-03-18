@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from src.utils import moving_average
+from src.utils import moving_average, moving_mape
 
 
 class Agent(ABC):
@@ -103,6 +103,7 @@ class LinUCBAgent(Agent):
 
         self.last_ucb = np.zeros(self.n_arms)
         self.reward_hist = []
+        self.pred_reward_hist = []
 
     def pull_arm(self, *args, **kwargs):
         if len(self.a_hist) < self.arm_dim:
@@ -196,12 +197,9 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         self.reward_global = None
         self.subarm_global = None
         self.subtheta_global = None
-        # self.arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        # self.arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
-        # self.max_arm_norm_local = np.max(
-        #     [np.linalg.norm(a) for a in self.arms_local])
         self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
-        self.agents_err_hist = [[] for _ in range(self.n_contexts)]
+        # might use later to log errors or delta theta
+        self.err_hist = [[] for _ in range(self.n_contexts)]
 
     def pull_arm(self, context_i):
         agent = self.context_agent[context_i]
@@ -222,23 +220,18 @@ class PartitionedAgentStatic(INDLinUCBAgent):
 
             if not self.is_split:
                 pred_reward = agent.theta_hat.T @ arm
-                # error = (reward - pred_reward) ** 2
-                error = abs((reward - pred_reward) / reward)
-                self.agents_err_hist[c_i].append(error)
-                if arm_leader is None and moving_average(self.agents_err_hist[c_i], win=self.win) <= self.err_th:
+                agent.pred_reward_hist.append(pred_reward.squeeze())
+                if arm_leader is None and moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
-                    print(f"ma={moving_average(self.agents_err_hist[c_i], win=self.win)}\n" +
+                    print(f"ma={moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win)}\n" +
                           f"theta_hat={agent.theta_hat.squeeze()}\n" +
                           f"{c_i_leader=}\n" +
                           f"{self.t=}")
-
             else:
                 arm = arm[self.k:]
                 # remove global arm contribution to reward for local arm update
                 pred_reward = self.reward_global + agent.theta_hat.T @ arm
-                # error = (reward - pred_reward) ** 2
-                error = abs(reward - pred_reward) / reward
-                self.agents_err_hist[c_i].append(error)
+                agent.pred_reward_hist.append(pred_reward)
                 reward -= self.reward_global
             self.update(reward, arm, c_i)
 

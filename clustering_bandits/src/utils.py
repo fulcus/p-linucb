@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from sklearn.metrics import mean_absolute_percentage_error
 
 
 def save_heatmap(fpath, arms, context_set, theta, theta_p):
@@ -22,7 +23,7 @@ def vector_norm_bound(max_component, dim):
     return np.sqrt(dim) * max_component
 
 
-def moving_average(arr, win=5):
-    if len(arr) < win:
+def moving_mape(y_true, y_pred, win=5):
+    if len(y_true) < win:
         return np.inf
-    return np.mean(arr[-win:])
+    return mean_absolute_percentage_error(y_true[-win:], y_pred[-win:])

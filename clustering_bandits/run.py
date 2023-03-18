@@ -81,14 +81,14 @@ if __name__ == '__main__':
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["n_contexts"],
             #              max_reward),
-            INDLinUCBAgent(
-                param_dict["arms"],
-                param_dict["n_contexts"],
-                param_dict["horizon"],
-                param_dict["lmbd"],
-                param_dict["max_theta_norm"],
-                param_dict["max_arm_norm"],
-                param_dict['sigma']),
+            # INDLinUCBAgent(
+            #     param_dict["arms"],
+            #     param_dict["n_contexts"],
+            #     param_dict["horizon"],
+            #     param_dict["lmbd"],
+            #     param_dict["max_theta_norm"],
+            #     param_dict["max_arm_norm"],
+            #     param_dict['sigma']),
             PartitionedAgentStatic(
                 param_dict["arms"],
                 param_dict["n_contexts"],
