@@ -15,20 +15,17 @@ class Environment(ABC):
 
         self.t = None
         self.noise = None
-        self.rewards = np.array([])
+        self.rewards = []
         self.context_indexes = np.arange(self.n_contexts)
         self.reset(0)
 
-    def round_all(self, pulled_arms_i):
-        """computes reward for each context, arm pair
-            pulled_arms_i:
-        """
+    def round_all(self, pulled_arms):
+        """computes reward for each context, arm pair"""
         obs_rewards = []
-        for x_i, a_j in zip(self.curr_indexes, pulled_arms_i):
-            obs_rewards.append(self.round(a_j, x_i))
+        for x_i, arm in zip(self.curr_indexes, pulled_arms):
+            obs_rewards.append(self.round(arm, x_i))
         # logging sum of rewards
-        self.rewards = np.append(self.rewards, sum(obs_rewards))
-        self.t += 1
+        self.rewards.append(sum(obs_rewards))
         return obs_rewards
 
     @abstractmethod
@@ -51,7 +48,7 @@ class Environment(ABC):
 
     def reset(self, i=0):
         self.t = 0
-        self.rewards = np.array([])
+        self.rewards = []
         np.random.seed(self.random_state + i)
         # different noise for each context
         # TODO OR diff noise for each round
@@ -70,8 +67,9 @@ class PartitionedEnvironment(Environment):
         self.theta_p = theta_p
         self.k = k  # first k global components
 
-    def round(self, arm, x_i):
+    def round(self, arm, c_i):
         obs_reward = (self.theta @ arm[:self.k]
-                      + self.theta_p[x_i] @ arm[self.k:]
-                      + self.noise[self.t, x_i])
+                      + self.theta_p[c_i] @ arm[self.k:]
+                      + self.noise[self.t, c_i])
+        # print(f"Env {c_i} arm {arm} {obs_reward}")
         return obs_reward

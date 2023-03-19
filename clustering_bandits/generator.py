@@ -6,13 +6,14 @@ import itertools
 import math
 from src.utils import *
 
+def vector_norm_bound(max_component, dim):
+    return np.sqrt(dim) * max_component
 
 def onehot_arms(dim_arm):
     return np.eye(dim_arm).tolist()
 
 
-def random_arms(n_arms, dim_arm, seed):
-    np.random.seed(seed)
+def random_arms(n_arms, dim_arm):
     return np.random.randint(0, 100, (n_arms, dim_arm)).tolist()
 
 
@@ -28,37 +29,41 @@ if __name__ == '__main__':
         description='generates test cases')
     parser.add_argument('-s', '--seed', type=int,
                         default=np.random.randint(0, 1000))
-    parser.add_argument('-a', '--arm', choices=['v', 'o', 'r'], default='v')
     args = parser.parse_args()
 
     lmbd = 1
     n_contexts = 10
-    arm_dim = 4
     k = 2  # global dim
     max_th = 100
     max_th_p = 100
-    max_a = 1
+    max_a = 100
 
+
+    # arms = vertex_arms(arm_dim, max_a)
+    # n_arms = len(arms)
+    n_arms = 16
+    contexts_arms = []
+    arms_len = []
+    theta_p = []
+
+    global_arms = np.random.randint(0, max_a, size=(n_arms, k)).tolist()
+    
+    for i in range(n_contexts):
+        a_len = np.random.randint(k+1, 6)
+        loc_dim = a_len - k
+        local_arms = np.random.randint(0, max_a, size=(n_arms, loc_dim)).tolist()
+        arms = [global_arms[j] + local_arms[j] for j in range(n_arms)]
+        theta_p_i = np.random.randint(-max_th_p, max_th_p,
+                                      size=loc_dim).tolist()
+        arms_len.append(a_len)
+        contexts_arms.append(arms)
+        theta_p.append(theta_p_i)
+
+    theta = np.random.randint(-max_th, max_th, size=(1, k)).round(2).tolist()
+    
+    arm_dim = max(arms_len)
     local_dim = arm_dim - k
 
-    if args.arm == 'v':
-        arms = vertex_arms(arm_dim, max_a)
-        n_arms = len(arms)
-    elif args.arm == 'o':
-        arms = onehot_arms(arm_dim)
-        n_arms = len(arms)
-    elif args.arm == 'r':
-        n_arms = 5
-        arms = random_arms(n_arms, arm_dim, args.seed)
-
-    np.random.seed(args.seed)
-    theta = np.random.uniform(-max_th, max_th, size=(1, k)).round(2).tolist()
-    np.random.seed(args.seed+1)
-    theta_p = np.random.uniform(-max_th_p, max_th_p,
-                                size=(n_contexts, local_dim))
-    theta_p = theta_p.round(2).tolist()
-
-    # only valid for v arms
     max_theta_norm = vector_norm_bound(max_th, arm_dim)
     max_theta_norm_local = vector_norm_bound(max_th, local_dim)
     max_arm_norm = vector_norm_bound(max_a, arm_dim)
@@ -79,10 +84,11 @@ if __name__ == '__main__':
         "max_theta_norm_local": max_theta_norm_local,
         "theta": theta,
         "theta_p": theta_p,
-        "arms": arms,
+        "arms": contexts_arms,
+        "arms_len": arms_len
     }
 
-    filename = f"{args.arm}_{args.seed}.json"
+    filename = f"diff_len_{args.seed}.json"
     out_folder = 'clustering_bandits/test/input/'
     os.makedirs(out_folder, exist_ok=True)
     with open(out_folder + filename, "w") as f:

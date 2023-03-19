@@ -37,7 +37,10 @@ if __name__ == '__main__':
         testcase, _ = testcase.split('.')
         # list to np.ndarray
         for k, v in param_dict.items():
-            if type(v) == list:
+            if k == "arms":
+                arms = v
+                param_dict[k] = [np.array(arms[c_i]) for c_i in range(len(arms))]
+            elif type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
 
         logs = {}

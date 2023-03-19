@@ -19,10 +19,6 @@ def save_heatmap(fpath, arms, context_set, theta, theta_p):
     # exit(0)
 
 
-def vector_norm_bound(max_component, dim):
-    return np.sqrt(dim) * max_component
-
-
 def moving_mape(y_true, y_pred, win=5):
     if len(y_true) < win:
         return np.inf

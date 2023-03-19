@@ -7,8 +7,6 @@ class Agent(ABC):
     def __init__(self, arms, n_contexts):
         self.arms = arms
         self.n_contexts = n_contexts
-        self.n_arms = arms.shape[0]
-        self.arm_dim = arms.shape[1]
         self.t = 0
         self.a_hist = []
         self.last_pulls = []
@@ -43,18 +41,20 @@ class Clairvoyant(Agent):
         self.k = k
 
     def pull_arm(self, context_i):
-        exp_rewards = np.zeros(self.n_arms)
-        for i, arm in enumerate(self.arms):
-            exp_rewards[i] = (self.theta @ arm[:self.k]
-                              + self.theta_p[context_i] @ arm[self.k:])
+        exp_rewards = []
+        for arm in self.arms[context_i]:
+            exp_rewards.append(self.theta @ arm[:self.k]
+                               + self.theta_p[context_i] @ arm[self.k:])
         arm_i = np.argmax(exp_rewards)
         self.a_hist.append(arm_i)
-        return self.arms[arm_i]
+        # print(f"Clair exp {context_i} {self.arms[context_i][arm_i]} {exp_rewards[arm_i]}")
+        return self.arms[context_i][arm_i]
 
     def update(self, reward, arm, context_i=None):
         self.t += 1
 
 
+# TODO refactor
 class UCB1Agent(Agent):
     def __init__(self, arms, n_contexts, max_reward=1):
         super().__init__(arms, n_contexts)
@@ -89,6 +89,9 @@ class LinUCBAgent(Agent):
     def __init__(self, arms, n_contexts, horizon, lmbd,
                  max_theta_norm, max_arm_norm, sigma=1):
         super().__init__(arms, n_contexts)
+        self.n_arms = arms.shape[0]
+        self.arm_dim = arms.shape[1]
+
         assert lmbd > 0
         self.lmbd = lmbd
         self.horizon = horizon
@@ -149,25 +152,25 @@ class INDLinUCBAgent(Agent):
         self.max_theta_norm = max_theta_norm
         self.max_arm_norm = max_arm_norm
         self.sigma = sigma
-        self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
+        # self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
         self.context_agent = [
             LinUCBAgent(
-                self.arms,
+                self.arms[i],
                 self.n_contexts,
                 self.horizon,
                 self.lmbd,
                 self.max_theta_norm,
                 self.max_arm_norm,
                 self.sigma)
-            for _ in range(self.n_contexts)
+            for i in range(self.n_contexts)
         ]
 
     def pull_arm(self, context_i):
         agent = self.context_agent[context_i]
         arm = agent.pull_arm()
-        arm_i = self.arm_index[tuple(arm)]
-        self.a_hist.append(arm_i)
-        agent.a_hist.append(arm_i)
+        # arm_i = self.arm_index[tuple(arm)]
+        self.a_hist.append(0)
+        agent.a_hist.append(0)
         return arm
 
     def update(self, reward, arm, context_i):
@@ -191,13 +194,12 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         self.err_th = err_th
         self.win = win
 
-        self.leader_i = None
         self.is_split = False
         self.t_split = None
         self.reward_global = None
         self.subarm_global = None
         self.subtheta_global = None
-        self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
+        # self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
         # might use later to log errors or delta theta
         self.err_hist = [[] for _ in range(self.n_contexts)]
 
@@ -207,9 +209,9 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         # if split has happened arm_i is index of second half
         if self.is_split:
             arm = np.concatenate([self.subarm_global, arm])
-        arm_i = self.arm_index[tuple(arm)]
-        self.a_hist.append(arm_i)
-        agent.a_hist.append(arm_i)
+        # arm_i = self.arm_index[tuple(arm)]
+        self.a_hist.append(0)
+        agent.a_hist.append(0)
         return arm
 
     def update_all(self, rewards):
@@ -248,13 +250,11 @@ class PartitionedAgentStatic(INDLinUCBAgent):
             print(f"t_split={self.t_split}")
 
     def _split_agents_params(self):
-        dim_local = self.arm_dim - self.k
-        arms_global = np.delete(self.arms, np.s_[self.k:], axis=1)
-        arms_local = np.delete(self.arms, np.s_[:self.k], axis=1)
-
-        for i, agent in enumerate(self.context_agent):
-            if i == self.leader_i:  # always false for static agent
-                continue
+        for agent in self.context_agent:
+            dim_local = agent.arm_dim - self.k
+            arms_global = np.delete(agent.arms, np.s_[self.k:], axis=1)
+            arms_local = np.delete(agent.arms, np.s_[:self.k], axis=1)
+            # print(f"{arms_global=}\n{arms_local=}")
             # remove global components from all agents
             agent.arm_dim = dim_local
             agent.max_arm_norm = self.max_arm_norm_local
