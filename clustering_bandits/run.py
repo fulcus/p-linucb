@@ -50,6 +50,7 @@ if __name__ == '__main__':
                                      theta=param_dict["theta"],
                                      theta_p=param_dict["theta_p"],
                                      k=param_dict["k"],
+                                     sampling_distr=None,
                                      sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
 
@@ -81,14 +82,14 @@ if __name__ == '__main__':
             # INDUCB1Agent(param_dict["arms"],
             #              param_dict["n_contexts"],
             #              max_reward),
-            # INDLinUCBAgent(
-            #     param_dict["arms"],
-            #     param_dict["n_contexts"],
-            #     param_dict["horizon"],
-            #     param_dict["lmbd"],
-            #     param_dict["max_theta_norm"],
-            #     param_dict["max_arm_norm"],
-            #     param_dict['sigma']),
+            INDLinUCBAgent(
+                param_dict["arms"],
+                param_dict["n_contexts"],
+                param_dict["horizon"],
+                param_dict["lmbd"],
+                param_dict["max_theta_norm"],
+                param_dict["max_arm_norm"],
+                param_dict['sigma']),
             PartitionedAgentStatic(
                 param_dict["arms"],
                 param_dict["n_contexts"],
@@ -99,8 +100,8 @@ if __name__ == '__main__':
                 param_dict["max_arm_norm"],
                 param_dict["max_arm_norm_local"],
                 k=param_dict["k"],
-                err_th=0.01,
-                win=30,
+                err_th=0.05,
+                win=20,
                 sigma=param_dict['sigma']),
             # CLUB(param_dict["arms"],
             #      param_dict["n_contexts"],
@@ -113,8 +114,9 @@ if __name__ == '__main__':
             print(agent_name)
             core = Core(env, agent)
             if isinstance(agent, PartitionedAgentStatic):
-                # for w in [10, 20, 30, 50, 70, 100]:
+                # for w in [2, 3, 5, 10, 20, 30]:
                 #     agent_name = f"{agent.__class__.__name__}_{w}"
+                #     print(agent_name)
                 #     agent.win = w
                 #     core = Core(env, agent)
                 #     logs[agent_name], a_hists[agent_name], t_splits[agent_name], err_hists = core.simulation(

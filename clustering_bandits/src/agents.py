@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from src.utils import moving_average, moving_mape
+from src.utils import moving_mape
 
 
 class Agent(ABC):
@@ -225,6 +225,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
                     arm_leader, c_i_leader = arm, c_i
                     print(f"ma={moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win)}\n" +
                           f"theta_hat={agent.theta_hat.squeeze()}\n" +
+                          f"arm_leader={arm_leader.squeeze()}\n" +
                           f"{c_i_leader=}\n" +
                           f"{self.t=}")
             else:

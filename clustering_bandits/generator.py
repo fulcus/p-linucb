@@ -34,10 +34,9 @@ if __name__ == '__main__':
     lmbd = 1
     n_contexts = 10
     arm_dim = 4
-    ctx_dim = 3
     k = 2  # global dim
-    max_th = 3
-    max_th_p = 1
+    max_th = 100
+    max_th_p = 100
     max_a = 1
 
     local_dim = arm_dim - k
@@ -54,7 +53,7 @@ if __name__ == '__main__':
 
     np.random.seed(args.seed)
     theta = np.random.uniform(-max_th, max_th, size=(1, k)).round(2).tolist()
-    np.random.seed(args.seed)
+    np.random.seed(args.seed+1)
     theta_p = np.random.uniform(-max_th_p, max_th_p,
                                 size=(n_contexts, local_dim))
     theta_p = theta_p.round(2).tolist()
