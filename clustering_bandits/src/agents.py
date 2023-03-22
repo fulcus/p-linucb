@@ -107,6 +107,14 @@ class LinUCBAgent(Agent):
         self.last_ucb = np.zeros(self.n_arms)
         self.reward_hist = []
         self.pred_reward_hist = []
+        self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
+
+    def update_hist(self, arm_whole, reward, pred_reward=None):
+        arm_i = self.arm_index[tuple(arm_whole)]
+        self.a_hist.append(arm_i)
+        self.reward_hist.append(reward)
+        if pred_reward is not None:
+            self.pred_reward_hist.append(pred_reward)
 
     def pull_arm(self, *args, **kwargs):
         if len(self.a_hist) < self.arm_dim:
@@ -169,16 +177,23 @@ class INDLinUCBAgent(Agent):
         agent = self.context_agent[context_i]
         arm = agent.pull_arm()
         # arm_i = self.arm_index[tuple(arm)]
-        self.a_hist.append(0)
-        agent.a_hist.append(0)
+        # self.a_hist.append(0)
+        #agent.a_hist.append(0)
         return arm
+    
+    def update_all(self, rewards):
+        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
+            self.context_agent[c_i].update_hist(arm, reward)
+            self.update(reward, arm=arm, context_i=c_i)
 
     def update(self, reward, arm, context_i):
+        # self.context_agent[context_i].update_hist(arm, reward)
         # print(context_i)
         self.context_agent[context_i].update(
             reward, arm)
         # if self.t % 500 == 0:
-        #     print(f"{self.t} {context_i} theta_hat={self.context_agent[context_i].theta_hat.squeeze()}")
+        # print(
+        #     f"{self.t} {context_i} theta_hat={self.context_agent[context_i].theta_hat.squeeze()}")
         self.t += 1
 
 
@@ -207,26 +222,28 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         self.err_hist = [[] for _ in range(self.n_contexts)]
 
     def pull_arm(self, context_i):
-        agent = self.context_agent[context_i]
+        # agent = self.context_agent[context_i]
         arm = self.context_agent[context_i].pull_arm()
         # if split has happened arm_i is index of second half
         if self.is_split:
             arm = np.concatenate([self.subarm_global, arm])
         # arm_i = self.arm_index[tuple(arm)]
-        self.a_hist.append(0)
-        agent.a_hist.append(0)
-        print(f"{self.t=} {context_i} arm={arm}")
+        # self.a_hist.append(0)
+        # agent.a_hist.append(0)
+        # print(f"{self.t=} {context_i} arm={arm}")
         return arm
 
     def update_all(self, rewards):
         arm_leader = None
         for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
             agent = self.context_agent[c_i]
-            agent.reward_hist.append(reward)
+            #agent.reward_hist.append(reward)
 
             if not self.is_split:
                 pred_reward = agent.theta_hat.T @ arm
-                agent.pred_reward_hist.append(pred_reward.squeeze())
+                #agent.pred_reward_hist.append(pred_reward.squeeze())
+                agent.update_hist(arm, reward, pred_reward.squeeze())
+                
                 if arm_leader is None and moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win) <= self.err_th:
                     arm_leader, c_i_leader = arm, c_i
                     print(f"ma={moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win)}\n" +
@@ -234,13 +251,15 @@ class PartitionedAgentStatic(INDLinUCBAgent):
                           f"arm_leader={arm_leader.squeeze()}\n" +
                           f"{c_i_leader=}\n" +
                           f"{self.t=}")
+                self.update(reward, arm, c_i)
             else:
-                arm = arm[self.k:]
+                local_arm = arm[self.k:]
                 # remove global arm contribution to reward for local arm update
-                pred_reward = self.reward_global + agent.theta_hat.T @ arm
-                agent.pred_reward_hist.append(pred_reward)
+                pred_reward = self.reward_global + agent.theta_hat.T @ local_arm
+                # agent.pred_reward_hist.append(pred_reward)
+                agent.update_hist(arm, reward, pred_reward.squeeze())
                 reward -= self.reward_global
-            self.update(reward, arm, c_i)
+                self.update(reward, local_arm, c_i)
 
         # recompute params at the end of round
         if arm_leader is not None:

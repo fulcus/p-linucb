@@ -193,6 +193,9 @@ if __name__ == '__main__':
                 ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
                         label=f"{label} ep {j}", color=f'C{n_epochs+i+j+1}')
                 if label.startswith("PartitionedAgent") and t_splits[label][j] is not None:
+                    #ax.set_xlim(left=t_splits[label][j])
+                    #ax.set_ylim(bottom=85000)
+
                     ax.axvline(
                         x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')
             if n_epochs > 1:
