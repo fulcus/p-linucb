@@ -47,7 +47,7 @@ class Clairvoyant(Agent):
                                + self.theta_p[context_i] @ arm[self.k:])
         arm_i = np.argmax(exp_rewards)
         self.a_hist.append(arm_i)
-        # print(f"Clair exp {context_i} {self.arms[context_i][arm_i]} {exp_rewards[arm_i]}")
+        # print(f"{self.t=} {context_i} arm={self.arms[context_i][arm_i]}")
         return self.arms[context_i][arm_i]
 
     def update(self, reward, arm, context_i=None):
@@ -174,8 +174,11 @@ class INDLinUCBAgent(Agent):
         return arm
 
     def update(self, reward, arm, context_i):
+        # print(context_i)
         self.context_agent[context_i].update(
             reward, arm)
+        # if self.t % 500 == 0:
+        #     print(f"{self.t} {context_i} theta_hat={self.context_agent[context_i].theta_hat.squeeze()}")
         self.t += 1
 
 
@@ -212,6 +215,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         # arm_i = self.arm_index[tuple(arm)]
         self.a_hist.append(0)
         agent.a_hist.append(0)
+        print(f"{self.t=} {context_i} arm={arm}")
         return arm
 
     def update_all(self, rewards):
@@ -250,10 +254,11 @@ class PartitionedAgentStatic(INDLinUCBAgent):
             print(f"t_split={self.t_split}")
 
     def _split_agents_params(self):
-        for agent in self.context_agent:
+        for c_i, agent in enumerate(self.context_agent):
             dim_local = agent.arm_dim - self.k
             arms_global = np.delete(agent.arms, np.s_[self.k:], axis=1)
             arms_local = np.delete(agent.arms, np.s_[:self.k], axis=1)
+            print(f"{arms_global=}\n{arms_local=}")
             # print(f"{arms_global=}\n{arms_local=}")
             # remove global components from all agents
             agent.arm_dim = dim_local

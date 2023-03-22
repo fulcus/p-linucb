@@ -39,7 +39,8 @@ if __name__ == '__main__':
         for k, v in param_dict.items():
             if k == "arms":
                 arms = v
-                param_dict[k] = [np.array(arms[c_i]) for c_i in range(len(arms))]
+                param_dict[k] = [np.array(arms[c_i])
+                                 for c_i in range(len(arms))]
             elif type(v) == list:
                 param_dict[k] = np.squeeze(np.asarray(v))
 
@@ -79,12 +80,9 @@ if __name__ == '__main__':
             #             param_dict["n_contexts"],
             #             param_dict["horizon"],
             #             param_dict["lmbd"],
-            #             param_dict["max_theta_norm_shared"] + param_dict["max_theta_norm_p"],
+            #             param_dict["max_theta_norm"],
             #             param_dict["max_arm_norm"],
             #             param_dict['sigma']),
-            # INDUCB1Agent(param_dict["arms"],
-            #              param_dict["n_contexts"],
-            #              max_reward),
             INDLinUCBAgent(
                 param_dict["arms"],
                 param_dict["n_contexts"],
@@ -103,7 +101,7 @@ if __name__ == '__main__':
                 param_dict["max_arm_norm"],
                 param_dict["max_arm_norm_local"],
                 k=param_dict["k"],
-                err_th=0.05,
+                err_th=0.001,
                 win=20,
                 sigma=param_dict['sigma']),
             # CLUB(param_dict["arms"],

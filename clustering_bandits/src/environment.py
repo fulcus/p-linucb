@@ -24,8 +24,10 @@ class Environment(ABC):
         obs_rewards = []
         for x_i, arm in zip(self.curr_indexes, pulled_arms):
             obs_rewards.append(self.round(arm, x_i))
+        self.t += 1
         # logging sum of rewards
         self.rewards.append(sum(obs_rewards))
+        # print(f"{self.t} roundall={sum(obs_rewards)}")
         return obs_rewards
 
     @abstractmethod
@@ -68,8 +70,15 @@ class PartitionedEnvironment(Environment):
         self.k = k  # first k global components
 
     def round(self, arm, c_i):
+        #print("round, ctx=", c_i, arm, self.theta_p[c_i])
+        # print("g",self.theta, arm[:self.k])
+        # print(c_i, self.theta_p[c_i], arm[self.k:])
+
         obs_reward = (self.theta @ arm[:self.k]
                       + self.theta_p[c_i] @ arm[self.k:]
                       + self.noise[self.t, c_i])
         # print(f"Env {c_i} arm {arm} {obs_reward}")
+        print("env", self.t, c_i, arm, "real=",(self.theta @ arm[:self.k]
+                      + self.theta_p[c_i] @ arm[self.k:]).squeeze(), "obs=",obs_reward)
+
         return obs_reward

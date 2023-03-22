@@ -13,8 +13,10 @@ def onehot_arms(dim_arm):
     return np.eye(dim_arm).tolist()
 
 
-def random_arms(n_arms, dim_arm):
-    return np.random.randint(0, 100, (n_arms, dim_arm)).tolist()
+def random_arms_permutations(n_arms, dim_arm):
+    tuples = [(-max_a, max_a) for _ in range(dim_arm)]
+    arms = [a for a in itertools.product(*tuples)]
+    return arms
 
 
 def vertex_arms(dim_arm, max_a):
@@ -41,24 +43,33 @@ if __name__ == '__main__':
 
     # arms = vertex_arms(arm_dim, max_a)
     # n_arms = len(arms)
-    n_arms = 16
-    contexts_arms = []
+    n_arms_glob = 3
+    n_arms_loc = 2
+    n_arms = n_arms_glob * n_arms_loc
     arms_len = []
     theta_p = []
 
-    global_arms = np.random.randint(0, max_a, size=(n_arms, k)).tolist()
-    
+    global_arms = np.random.randint(0, max_a, size=(n_arms_glob, k)).tolist()
+    print(f"{global_arms=}")
+    arms = []
     for i in range(n_contexts):
         a_len = np.random.randint(k+1, 6)
         loc_dim = a_len - k
-        local_arms = np.random.randint(0, max_a, size=(n_arms, loc_dim)).tolist()
-        arms = [global_arms[j] + local_arms[j] for j in range(n_arms)]
+        local_arms = np.random.randint(0, max_a, size=(n_arms_loc, loc_dim)).tolist()
+        print(f"{i} {local_arms=}")
+        arms_agent = []
+        for g_arm in global_arms:
+            for l_arm in local_arms:
+                arms_agent.append(g_arm + l_arm)
+            
+        arms.append(arms_agent)
+
         theta_p_i = np.random.randint(-max_th_p, max_th_p,
                                       size=loc_dim).tolist()
         arms_len.append(a_len)
-        contexts_arms.append(arms)
         theta_p.append(theta_p_i)
 
+    print("arms=", arms)
     theta = np.random.randint(-max_th, max_th, size=(1, k)).round(2).tolist()
     
     arm_dim = max(arms_len)
@@ -84,7 +95,7 @@ if __name__ == '__main__':
         "max_theta_norm_local": max_theta_norm_local,
         "theta": theta,
         "theta_p": theta_p,
-        "arms": contexts_arms,
+        "arms": arms,
         "arms_len": arms_len
     }
 
