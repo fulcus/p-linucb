@@ -13,40 +13,29 @@ class Environment(ABC):
         self.random_state = random_state
         self.sampling_distr = sampling_distr
 
-        self.t = None
+        self.t = 0
         self.noise = None
         self.rewards = []
         self.context_indexes = np.arange(self.n_contexts)
         self.reset(0)
 
-    def round_all(self, pulled_arms):
-        """computes reward for each context, arm pair"""
-        obs_rewards = []
-        for x_i, arm in zip(self.curr_indexes, pulled_arms):
-            obs_rewards.append(self.round(arm, x_i))
-        self.t += 1
-        # logging sum of rewards
-        self.rewards.append(sum(obs_rewards))
-        # print(f"{self.t} roundall={sum(obs_rewards)}")
-        return obs_rewards
-
     @abstractmethod
     def round(self, arm, x_i):
-        pass
+        self.t += 1
 
-    def get_contexts(self):
+    def get_context(self):
         if self.sampling_distr == "uniform":
             np.random.seed(self.random_state)
-            self.curr_indexes = np.random.choice(
-                self.context_indexes, size=self.n_contexts)
+            self.curr_index = np.random.choice(
+                self.context_indexes, size=1)
         elif self.sampling_distr == "long_tail":
             np.random.seed(self.random_state)
             p = [0.55, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
-            self.curr_indexes = np.random.choice(
-                self.context_indexes, size=self.n_contexts, p=p)
+            self.curr_index = np.random.choice(
+                self.context_indexes, size=1, p=p)
         else:  # round robin
-            self.curr_indexes = self.context_indexes
-        return self.curr_indexes
+            self.curr_index = self.t % self.n_contexts
+        return self.curr_index
 
     def reset(self, i=0):
         self.t = 0
@@ -69,15 +58,10 @@ class PartitionedEnvironment(Environment):
         self.theta_p = theta_p
         self.k = k  # first k global components
 
-    def round(self, arm, c_i):
-        # print("round, ctx=", c_i, arm, self.theta_p[c_i])
-        # print("g",self.theta, arm[:self.k])
-        # print(c_i, self.theta_p[c_i], arm[self.k:])
-
+    def round(self, arm):
         obs_reward = (self.theta @ arm[:self.k]
-                      + self.theta_p[c_i] @ arm[self.k:]
-                      + self.noise[self.t, c_i])
-        # print("env", self.t, c_i, arm, "real=",(self.theta @ arm[:self.k]
-        #               + self.theta_p[c_i] @ arm[self.k:]).squeeze(), "obs=",obs_reward)
-
+                      + self.theta_p[self.curr_index] @ arm[self.k:]
+                      + self.noise[self.t, self.curr_index])
+        self.rewards.append(obs_reward)
+        self.t += 1
         return obs_reward

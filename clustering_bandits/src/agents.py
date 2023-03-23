@@ -7,6 +7,8 @@ class Agent(ABC):
     def __init__(self, arms, n_contexts):
         self.arms = arms
         self.n_contexts = n_contexts
+        # self.n_arms = arms.shape[0]
+        # self.arm_dim = arms.shape[1]
         self.t = 0
         self.a_hist = []
         self.last_pulls = []
@@ -15,20 +17,9 @@ class Agent(ABC):
     def pull_arm(self, context_i):
         pass
 
-    def pull_all(self, indexes):
-        self.last_pulls = []
-        self.curr_indexes = indexes
-        for c_i in self.curr_indexes:
-            self.last_pulls.append(self.pull_arm(c_i))
-        return self.last_pulls
-
     @abstractmethod
     def update(self, reward, *args, **kwargs):
         self.t += 1
-
-    def update_all(self, rewards):
-        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
-            self.update(reward, arm=arm, context_i=c_i)
 
 
 class Clairvoyant(Agent):
@@ -41,20 +32,21 @@ class Clairvoyant(Agent):
         self.k = k
 
     def pull_arm(self, context_i):
+        self.last_c_i = context_i
         exp_rewards = []
         for arm in self.arms[context_i]:
             exp_rewards.append(self.theta @ arm[:self.k]
                                + self.theta_p[context_i] @ arm[self.k:])
         arm_i = np.argmax(exp_rewards)
         self.a_hist.append(arm_i)
-        # print(f"{self.t=} {context_i} arm={self.arms[context_i][arm_i]}")
         return self.arms[context_i][arm_i]
 
-    def update(self, reward, arm, context_i=None):
+    def update(self, reward, arm):
         self.t += 1
 
+#  TODO refactor or delete
 
-# TODO refactor
+
 class UCB1Agent(Agent):
     def __init__(self, arms, n_contexts, max_reward=1):
         super().__init__(arms, n_contexts)
@@ -174,32 +166,20 @@ class INDLinUCBAgent(Agent):
         ]
 
     def pull_arm(self, context_i):
-        agent = self.context_agent[context_i]
-        arm = agent.pull_arm()
-        # arm_i = self.arm_index[tuple(arm)]
-        # self.a_hist.append(0)
-        #agent.a_hist.append(0)
+        self.last_c_i = context_i
+        arm = self.context_agent[context_i].pull_arm()
         return arm
-    
-    def update_all(self, rewards):
-        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
-            self.context_agent[c_i].update_hist(arm, reward)
-            self.update(reward, arm=arm, context_i=c_i)
 
-    def update(self, reward, arm, context_i):
-        # self.context_agent[context_i].update_hist(arm, reward)
-        # print(context_i)
-        self.context_agent[context_i].update(
+    def update(self, reward, arm):
+        self.context_agent[self.last_c_i].update_hist(arm, reward)
+        self.context_agent[self.last_c_i].update(
             reward, arm)
-        # if self.t % 500 == 0:
-        # print(
-        #     f"{self.t} {context_i} theta_hat={self.context_agent[context_i].theta_hat.squeeze()}")
         self.t += 1
 
 
 class PartitionedAgentStatic(INDLinUCBAgent):
-    """An independent linear bandit per context. 
-    The first bandit that learns a good approximation of theta fixes 
+    """An independent linear bandit per context.
+    The first bandit that learns a good approximation of theta fixes
     the first k components of theta for all."""
 
     def __init__(self, arms, n_contexts, horizon, lmbd,
@@ -217,68 +197,47 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         self.reward_global = None
         self.subarm_global = None
         self.subtheta_global = None
-        # self.arm_index = {tuple(arm): i for i, arm in enumerate(arms)}
         # might use later to log errors or delta theta
         self.err_hist = [[] for _ in range(self.n_contexts)]
 
     def pull_arm(self, context_i):
-        # agent = self.context_agent[context_i]
+        self.last_c_i = context_i
         arm = self.context_agent[context_i].pull_arm()
         # if split has happened arm_i is index of second half
         if self.is_split:
             arm = np.concatenate([self.subarm_global, arm])
-        # arm_i = self.arm_index[tuple(arm)]
-        # self.a_hist.append(0)
-        # agent.a_hist.append(0)
-        # print(f"{self.t=} {context_i} arm={arm}")
         return arm
 
-    def update_all(self, rewards):
-        arm_leader = None
-        for arm, reward, c_i in zip(self.last_pulls, rewards, self.curr_indexes):
-            agent = self.context_agent[c_i]
-            #agent.reward_hist.append(reward)
+    def update(self, reward, arm):
+        agent = self.context_agent[self.last_c_i]
+        if not self.is_split:
+            pred_reward = agent.theta_hat.T @ arm
+            agent.update_hist(arm, reward, pred_reward.squeeze())
+            agent.update(reward, arm)
+            if moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win) <= self.err_th:
+                self.subtheta_global = agent.theta_hat[:self.k]
+                self.subarm_global = arm[:self.k]
+                self.reward_global = self.subtheta_global.T @ self.subarm_global
 
-            if not self.is_split:
-                pred_reward = agent.theta_hat.T @ arm
-                #agent.pred_reward_hist.append(pred_reward.squeeze())
-                agent.update_hist(arm, reward, pred_reward.squeeze())
-                
-                if arm_leader is None and moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win) <= self.err_th:
-                    arm_leader, c_i_leader = arm, c_i
-                    print(f"ma={moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win)}\n" +
-                          f"theta_hat={agent.theta_hat.squeeze()}\n" +
-                          f"arm_leader={arm_leader.squeeze()}\n" +
-                          f"{c_i_leader=}\n" +
-                          f"{self.t=}")
-                self.update(reward, arm, c_i)
-            else:
-                local_arm = arm[self.k:]
-                # remove global arm contribution to reward for local arm update
-                pred_reward = self.reward_global + agent.theta_hat.T @ local_arm
-                # agent.pred_reward_hist.append(pred_reward)
-                agent.update_hist(arm, reward, pred_reward.squeeze())
-                reward -= self.reward_global
-                self.update(reward, local_arm, c_i)
+                self.is_split = True
+                self.t_split = self.t
 
-        # recompute params at the end of round
-        if arm_leader is not None:
-            self.subtheta_global = self.context_agent[c_i_leader].theta_hat[:self.k]
-            self.subarm_global = arm_leader[:self.k]
-            self.reward_global = self.subtheta_global.T @ self.subarm_global
-
-            self._split_agents_params()
-            self.is_split = True
-            self.t_split = int(self.t / self.n_contexts)
-            print(f"t_split={self.t_split}")
+                self._split_agents_params()
+                self._print_debug(agent, arm)
+        else:
+            local_arm = arm[self.k:]
+            # remove global arm contribution to reward for local arm update
+            pred_reward = self.reward_global + agent.theta_hat.T @ local_arm
+            agent.update_hist(arm, reward, pred_reward.squeeze())
+            reward -= self.reward_global
+            agent.update(reward, local_arm)
+        self.t += 1
 
     def _split_agents_params(self):
         for c_i, agent in enumerate(self.context_agent):
             dim_local = agent.arm_dim - self.k
             arms_global = np.delete(agent.arms, np.s_[self.k:], axis=1)
             arms_local = np.delete(agent.arms, np.s_[:self.k], axis=1)
-            print(f"{arms_global=}\n{arms_local=}")
-            # print(f"{arms_global=}\n{arms_local=}")
             # remove global components from all agents
             agent.arm_dim = dim_local
             agent.max_arm_norm = self.max_arm_norm_local
@@ -293,3 +252,10 @@ class PartitionedAgentStatic(INDLinUCBAgent):
             agent.b_vect = A_loc.T @ y_loc.T
             agent.V_t_inv = np.linalg.inv(agent.V_t)
             agent.theta_hat = agent.V_t_inv @ agent.b_vect
+
+    def _print_debug(self, agent, arm):
+        print(f"ma={moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win)}\n" +
+              f"theta_hat={agent.theta_hat.squeeze()}\n" +
+              f"arm_leader={arm.squeeze()}\n" +
+              f"{self.last_c_i=}\n" +
+              f"t_split={self.t_split}")
