@@ -101,7 +101,7 @@ if __name__ == '__main__':
                 param_dict["max_arm_norm"],
                 param_dict["max_arm_norm_local"],
                 k=param_dict["k"],
-                err_th=0.001,
+                err_th=0.01,
                 win=20,
                 sigma=param_dict['sigma']),
             # CLUB(param_dict["arms"],
@@ -193,8 +193,8 @@ if __name__ == '__main__':
                 ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
                         label=f"{label} ep {j}", color=f'C{n_epochs+i+j+1}')
                 if label.startswith("PartitionedAgent") and t_splits[label][j] is not None:
-                    #ax.set_xlim(left=t_splits[label][j])
-                    #ax.set_ylim(bottom=85000)
+                    # ax.set_xlim(left=t_splits[label][j])
+                    # ax.set_ylim(bottom=85000)
 
                     ax.axvline(
                         x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')

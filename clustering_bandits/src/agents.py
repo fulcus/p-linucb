@@ -50,6 +50,7 @@ class Clairvoyant(Agent):
 class UCB1Agent(Agent):
     def __init__(self, arms, n_contexts, max_reward=1):
         super().__init__(arms, n_contexts)
+        self.n_arms = len(arms)
         self.max_reward = max_reward
         self.avg_reward = np.ones(self.n_arms) * np.inf
         self.n_pulls = np.zeros(self.n_arms)
@@ -113,7 +114,9 @@ class LinUCBAgent(Agent):
             arm_i = len(self.a_hist) % self.n_arms
         else:
             arm_i = self._estimate_linucb_arm()
-        # self.a_hist.append(arm_i)
+        # debug
+        # if len(self.a_hist) == self.arm_dim:
+        #     print(f"{self.t=} finished round robin, {self.arm_dim=}")
         return self.arms[arm_i]
 
     def update(self, reward, arm, *args, **kwargs):
@@ -221,9 +224,8 @@ class PartitionedAgentStatic(INDLinUCBAgent):
 
                 self.is_split = True
                 self.t_split = self.t
-
-                self._split_agents_params()
                 self._print_debug(agent, arm)
+                self._split_agents_params()
         else:
             local_arm = arm[self.k:]
             # remove global arm contribution to reward for local arm update
