@@ -24,17 +24,21 @@ if __name__ == '__main__':
     in_dir = 'clustering_bandits/test/input/'
     out_dir = f'clustering_bandits/test/output/simulation_{args.sim_id}/'
     # os.makedirs(out_dir + 'tex/', exist_ok=True)
-    os.makedirs(out_dir + 'png/', exist_ok=True)
-    final_logs = {}
+    # os.makedirs(out_dir + 'png/', exist_ok=True)
+
     test_files = os.listdir(
         in_dir) if args.test_file is None else [args.test_file]
 
     for testcase in test_files:
         print(f'############## {testcase} ##############')
-
         with open(f'{in_dir}{testcase}') as f:
             param_dict = json.load(f)
         testcase, _ = testcase.split('.')
+        testcase_dir = out_dir + f'png/{testcase}/'
+        os.makedirs(testcase_dir, exist_ok=True)
+        logging.basicConfig(filename=testcase_dir + 'logs.log',
+                            filemode='w', level=logging.INFO)
+
         # list to np.ndarray
         for k, v in param_dict.items():
             if k == "arms":
@@ -54,7 +58,7 @@ if __name__ == '__main__':
                                      theta=param_dict["theta"],
                                      theta_p=param_dict["theta_p"],
                                      k=param_dict["k"],
-                                     sampling_distr=None,
+                                     sampling_distr=param_dict["context_distr"],
                                      sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
 
@@ -101,7 +105,7 @@ if __name__ == '__main__':
                 param_dict["max_arm_norm"],
                 param_dict["max_arm_norm_local"],
                 k=param_dict["k"],
-                err_th=0.01,
+                err_th=0.1,
                 win=20,
                 sigma=param_dict['sigma']),
             # CLUB(param_dict["arms"],
@@ -138,6 +142,8 @@ if __name__ == '__main__':
             for i in range(param_dict['n_epochs']):
                 regret[label][i, :] = clairvoyant_logs[i, :] - \
                     logs[label][i, :]
+            logging.info(
+                f"{label} regret: {np.mean(np.sum(regret[label].T, axis=0))}")
 
         # inst reward, inst regret and cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+1, step=250)
@@ -174,8 +180,6 @@ if __name__ == '__main__':
         ax[2].set_title('Cumulative Regret')
         ax[2].legend()
 
-        testcase_dir = out_dir + f'png/{testcase}/'
-        os.makedirs(testcase_dir, exist_ok=True)
         # tikz.save(out_folder + f"tex/{testcase_id}_all.tex")
         plt.savefig(testcase_dir + "all.png")
 
@@ -256,9 +260,6 @@ if __name__ == '__main__':
                 ax.legend()
                 plt.savefig(testcase_dir + f"err_c_{j}.png")
         """
-        # logging
-        final_logs[f'{testcase}'] = {label: np.mean(
-            np.sum(regret[label].T, axis=0)) for label in regret.keys()}
 
         # arm history plots
         n_arms = param_dict["n_arms"]
@@ -282,6 +283,3 @@ if __name__ == '__main__':
 
             # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
             plt.savefig(testcase_dir + f"a_hist_temp.png")
-
-    with open(out_dir + f"logs.json", "w") as f:
-        json.dump(final_logs, f, indent=4)

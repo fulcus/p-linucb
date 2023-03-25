@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 from src.utils import moving_mape
+import logging
 
 
 class Agent(ABC):
@@ -236,7 +237,7 @@ class PartitionedAgentStatic(INDLinUCBAgent):
         self.t += 1
 
     def _split_agents_params(self):
-        for c_i, agent in enumerate(self.context_agent):
+        for agent in self.context_agent:
             dim_local = agent.arm_dim - self.k
             arms_global = np.delete(agent.arms, np.s_[self.k:], axis=1)
             arms_local = np.delete(agent.arms, np.s_[:self.k], axis=1)
@@ -256,8 +257,8 @@ class PartitionedAgentStatic(INDLinUCBAgent):
             agent.theta_hat = agent.V_t_inv @ agent.b_vect
 
     def _print_debug(self, agent, arm):
-        print(f"ma={moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win)}\n" +
-              f"theta_hat={agent.theta_hat.squeeze()}\n" +
-              f"arm_leader={arm.squeeze()}\n" +
-              f"{self.last_c_i=}\n" +
-              f"t_split={self.t_split}")
+        logging.info(f"\nma={moving_mape(agent.reward_hist, agent.pred_reward_hist, win=self.win)}\n" +
+                     f"theta_hat={agent.theta_hat.squeeze()}\n" +
+                     f"arm_leader={arm.squeeze()}\n" +
+                     f"{self.last_c_i=}\n" +
+                     f"t_split={self.t_split}")

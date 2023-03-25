@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 class Environment(ABC):
     def __init__(self, n_rounds, arms, n_contexts, theta,
-                 sampling_distr=None, sigma=0.01, random_state=1):
+                 sampling_distr="round_robin", sigma=0.01, random_state=1):
         self.n_rounds = n_rounds
         self.arms = arms
         self.theta = theta
@@ -29,10 +29,15 @@ class Environment(ABC):
             self.curr_index = np.random.choice(
                 self.context_indexes, size=1)
         elif self.sampling_distr == "long_tail":
-            np.random.seed(self.random_state)
-            p = [0.55, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
+            # np.random.seed(self.random_state + self.t)
+            p = [0.5]
+            long_tail_p = (1 - 0.5) / (self.n_contexts - 1)
+            for i in range(1, self.n_contexts):
+                p.append(long_tail_p)
+            #print(p)
+            #p = [0.55, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]
             self.curr_index = np.random.choice(
-                self.context_indexes, size=1, p=p)
+                self.context_indexes, p=p)
         else:  # round robin
             self.curr_index = self.t % self.n_contexts
         return self.curr_index
