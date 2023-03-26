@@ -34,7 +34,7 @@ if __name__ == '__main__':
         with open(f'{in_dir}{testcase}') as f:
             param_dict = json.load(f)
         testcase, _ = testcase.split('.')
-        testcase_dir = out_dir + f'png/{testcase}/'
+        testcase_dir = out_dir + f'{testcase}/'
         os.makedirs(testcase_dir, exist_ok=True)
         logging.basicConfig(filename=testcase_dir + 'logs.log',
                             filemode='w', level=logging.INFO)
@@ -105,7 +105,7 @@ if __name__ == '__main__':
                 param_dict["max_arm_norm"],
                 param_dict["max_arm_norm_local"],
                 k=param_dict["k"],
-                err_th=0.1,
+                err_th=param_dict["err_th"],
                 win=20,
                 sigma=param_dict['sigma']),
             # CLUB(param_dict["arms"],
@@ -214,7 +214,7 @@ if __name__ == '__main__':
         ax.legend()
 
         # tikz.save(out_folder + f"tex/{testcase_id}_regret.tex")
-        plt.savefig(testcase_dir + "regret.png")
+        plt.savefig(testcase_dir + f"regret_{testcase}.png")
 
         # Error plots
         """

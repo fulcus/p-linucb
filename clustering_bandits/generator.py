@@ -60,9 +60,14 @@ def main(args):
         "sigma": 0.1,
         "seed": args.seed,
         "context_distr": args.context_distr,
+        "err_th": args.err_th,
+        "max_th": max_th,
+        "max_th_p": max_th_p,
+        "max_a": max_a,
+        "k": k,
+        "arm_dim_max": arm_dim_max,
         "n_arms": n_arms,
         "n_contexts": n_contexts,
-        "k": k,
         "lmbd": lmbd,
         "max_arm_norm": max_arm_norm,
         "max_arm_norm_local": max_arm_norm_local,
@@ -91,6 +96,7 @@ if __name__ == '__main__':
                         default="eqlen")
     parser.add_argument('-c', '--context_distr', type=str, choices=["uniform", "long_tail", "round_robin"],
                         default="round_robin")
+    parser.add_argument('-e', '--err_th', type=float, default=0.01)
 
     args = parser.parse_args()
     main(args)
