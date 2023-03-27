@@ -58,7 +58,8 @@ if __name__ == '__main__':
                                      theta=param_dict["theta"],
                                      theta_p=param_dict["theta_p"],
                                      k=param_dict["k"],
-                                     sampling_distr=param_dict["context_distr"],
+                                     context_distr=param_dict["context_distr"],
+                                     popular_freq=param_dict["popular_freq"],
                                      sigma=param_dict['sigma'],
                                      random_state=param_dict['seed'])
 

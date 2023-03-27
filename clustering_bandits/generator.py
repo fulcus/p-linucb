@@ -60,6 +60,7 @@ def main(args):
         "sigma": 0.1,
         "seed": args.seed,
         "context_distr": args.context_distr,
+        "popular_freq": None,
         "err_th": args.err_th,
         "max_th": max_th,
         "max_th_p": max_th_p,
