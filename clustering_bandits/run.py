@@ -21,22 +21,22 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--test_file', default=None)
     args = parser.parse_args()
 
-    in_dir = 'clustering_bandits/test/input/'
+    in_dir = f'clustering_bandits/test/input/simulation_{args.sim_id}/'
     out_dir = f'clustering_bandits/test/output/simulation_{args.sim_id}/'
-    # os.makedirs(out_dir + 'tex/', exist_ok=True)
-    # os.makedirs(out_dir + 'png/', exist_ok=True)
+    os.makedirs(in_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
 
     test_files = os.listdir(
         in_dir) if args.test_file is None else [args.test_file]
 
     for testcase in test_files:
         print(f'############## {testcase} ##############')
-        with open(f'{in_dir}{testcase}') as f:
+        with open(os.path.join(in_dir, testcase)) as f:
             param_dict = json.load(f)
         testcase, _ = testcase.split('.')
-        testcase_dir = out_dir + f'{testcase}/'
+        testcase_dir = os.path.join(out_dir, testcase)
         os.makedirs(testcase_dir, exist_ok=True)
-        logging.basicConfig(filename=testcase_dir + 'logs.log',
+        logging.basicConfig(filename=os.path.join(testcase_dir, 'logs.log'),
                             filemode='w', level=logging.INFO)
 
         # list to np.ndarray
@@ -45,7 +45,7 @@ if __name__ == '__main__':
                 arms = v
                 param_dict[k] = [np.array(arms[c_i])
                                  for c_i in range(len(arms))]
-            elif type(v) == list:
+            elif isinstance(v, list):
                 param_dict[k] = np.squeeze(np.asarray(v))
 
         logs = {}
@@ -138,6 +138,7 @@ if __name__ == '__main__':
         clairvoyant_logs = clairvoyant_logs.astype(np.float64)
         regret = {label: np.inf *
                   np.ones((param_dict['n_epochs'], param_dict["horizon"])) for label in logs.keys()}
+        delta_regret = {}
         for label in regret.keys():
             logs[label] = logs[label].astype(np.float64)
             for i in range(param_dict['n_epochs']):
@@ -145,6 +146,18 @@ if __name__ == '__main__':
                     logs[label][i, :]
             logging.info(
                 f"{label} regret: {np.mean(np.sum(regret[label].T, axis=0))}")
+        # delta regret
+        if "INDLinUCBAgent" in regret.keys():
+            for label in regret.keys():
+                if label == "INDLinUCBAgent":
+                    continue
+                delta_regret[label] = np.inf * np.ones((param_dict['n_epochs'],
+                                                        param_dict["horizon"]))
+                for i in range(param_dict['n_epochs']):
+                    delta_regret[label][i, :] = regret["INDLinUCBAgent"][i, :] \
+                        - regret[label][i, :]
+                logging.info(
+                    f"{label} delta regret: {np.mean(np.sum(delta_regret[label].T, axis=0))}")
 
         # inst reward, inst regret and cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+1, step=250)
@@ -181,8 +194,7 @@ if __name__ == '__main__':
         ax[2].set_title('Cumulative Regret')
         ax[2].legend()
 
-        # tikz.save(out_folder + f"tex/{testcase_id}_all.tex")
-        plt.savefig(testcase_dir + "all.png")
+        plt.savefig(os.path.join(testcase_dir, "all.png"))
 
         #  cumulative regret plot
         x = np.arange(1, param_dict["horizon"]+50, step=50)
@@ -194,93 +206,124 @@ if __name__ == '__main__':
         sqrtn = np.sqrt(n_epochs)
         for i, label in enumerate(regret.keys()):
             # one plot per epoch
-            for j in range(n_epochs):
-                ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
-                        label=f"{label} ep {j}", color=f'C{n_epochs+i+j+1}')
-                if label.startswith("PartitionedAgent") and t_splits[label][j] is not None:
-                    # ax.set_xlim(left=t_splits[label][j])
-                    # ax.set_ylim(bottom=85000)
+            #  for j in range(n_epochs):
+            #     ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
+            #             label=f"{label} ep {j}", color=f'C{n_epochs+i+j+1}')
+            #     if label.startswith("PartitionedAgent") and t_splits[label][j] is not None:
+            #         # ax.set_xlim(left=t_splits[label][j])
+            #         # ax.set_ylim(bottom=85000)
 
-                    ax.axvline(
-                        x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')
-            if n_epochs > 1:
-                # mean and std
-                ax.plot(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[
-                        x], label=f"{label} mean", color=f'C{i+n_epochs+1}')
-                ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
-                                np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
+            #         ax.axvline(
+            #             x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')
+            # if n_epochs > 1:
+            # mean and std
+            ax.plot(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[
+                    x], label=f"{label} mean", color=f'C{i+n_epochs+1}')
+            ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
+                            np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         ax.set_title('Cumulative Regret')
         ax.legend()
+        plt.savefig(os.path.join(testcase_dir, f"regret_{testcase}.png"))
 
-        # tikz.save(out_folder + f"tex/{testcase_id}_regret.tex")
-        plt.savefig(testcase_dir + f"regret_{testcase}.png")
+        # delta regrets
+        x = np.arange(1, param_dict["horizon"]+50, step=50)
+        first_log = next(iter(delta_regret.values()))
+        x[-1] = min(x[-1], len(np.mean(np.cumsum(first_log.T, axis=0), axis=1))-1)
+        f, ax = plt.subplots(1, figsize=(20, 10))
+        n_epochs = param_dict['n_epochs']
+        sqrtn = np.sqrt(n_epochs)
+        for i, label in enumerate(delta_regret.keys()):
+            # one plot per epoch
+            # for j in range(n_epochs):
+            #     ax.plot(x, np.cumsum(delta_regret[label][j].T, axis=0)[x],
+            #             label=f"{label} ep {j}", color=f'C{n_epochs+i+j+1}')
+            #     if label.startswith("PartitionedAgent") and t_splits[label][j] is not None:
+            #         # ax.set_xlim(left=t_splits[label][j])
+            #         # ax.set_ylim(bottom=85000)
+
+            #         ax.axvline(
+            #             x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')
+            # if n_epochs > 1:
+            # mean and std
+            ax.plot(x, np.mean(delta_regret[label].T, axis=1)
+                       [x], label=label, color=f'C{i+1}')
+            ax.fill_between(x, np.mean(delta_regret[label].T, axis=1)[x]-np.std(delta_regret[label].T, axis=1)[x]/sqrtn,
+                               np.mean(delta_regret[label].T, axis=1)[x]+np.std(delta_regret[label].T, axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+1}')
+            # cumulative
+            # ax.plot(x, np.mean(np.cumsum(delta_regret[label].T, axis=0), axis=1)[
+            #         x], label=f"{label}", color=f'C{i+n_epochs+1}')
+            # ax.fill_between(x, np.mean(np.cumsum(delta_regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(delta_regret[label].T, axis=0), axis=1)[x]/sqrtn,
+            #                 np.mean(np.cumsum(delta_regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(delta_regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
+        ax.set_xlim(left=0)
+        # ax.set_ylim(bottom=0)
+        ax.set_title('Instanteneous Delta Regret')
+        ax.legend()
+
+        plt.savefig(os.path.join(testcase_dir, f"delta_regret_{testcase}.png"))
 
         # Error plots
-        """
-        if err_hists.any():
-            # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
-            # n_epochs = err_hists.shape[0]
-            n_contexts = err_hists.shape[1]
-            
-            err_logs = {}  # epoch: context: [errors at each timestep]
-            # by epoch
-            for i in range(n_epochs):
-                err_logs[i] = {}
-                f, ax = plt.subplots(1, figsize=(20, 10))
-                for j in range(n_contexts):
-                    err_logs[i][j] = err_hists.squeeze()[i, j].tolist()
-                    ax.plot(x, err_hists[i, j][x],
-                            label=f"c_{j}", color=f'C{j+1}')
-                    if label == "PartitionedAgent" and t_splits[i] is not None:
-                        ax.axvline(
-                            x=t_splits[i], color=f'C{i+1}', label=f'split time')
 
-                ax.set_xlim(left=0)
-                ax.set_ylim(bottom=0)
-                ax.set_title(f'Squared Error, Epoch {i}')
-                ax.legend()
-                plt.savefig(testcase_dir + f"err_ep_{i}.png")
+        # if err_hists.any():
+        #     # err_hists.shape = (n_epochs, n_contexts, horizon, 1)
+        #     # n_epochs = err_hists.shape[0]
+        #     n_contexts = err_hists.shape[1]
 
-            with open(testcase_dir + "err.json", "w") as f:
-                json.dump(err_logs, f, indent=4)
+        #     err_logs = {}  # epoch: context: [errors at each timestep]
+        #     # by epoch
+        #     for i in range(n_epochs):
+        #         err_logs[i] = {}
+        #         f, ax = plt.subplots(1, figsize=(20, 10))
+        #         for j in range(n_contexts):
+        #             err_logs[i][j] = err_hists.squeeze()[i, j].tolist()
+        #             ax.plot(x, err_hists[i, j][x],
+        #                     label=f"c_{j}", color=f'C{j+1}')
+        #             if label == "PartitionedAgent" and t_splits[i] is not None:
+        #                 ax.axvline(
+        #                     x=t_splits[i], color=f'C{i+1}', label=f'split time')
 
-            # by context
-            for j in range(n_contexts):
-                f, ax = plt.subplots(1, figsize=(20, 10))
-                for i in range(n_epochs):
-                    ax.plot(x, err_hists[i, j][x],
-                            label=f"ep {i}", color=f'C{i+1}')
-                    if label == "PartitionedAgent" and t_splits[i] is not None:
-                        ax.axvline(x=t_splits[i], color=f'C{i+1}',
-                                label=f'split time ep {i}')
-                ax.set_xlim(left=0)
-                ax.set_ylim(bottom=0)
-                ax.set_title(f'Squared Error, Context {j}')
-                ax.legend()
-                plt.savefig(testcase_dir + f"err_c_{j}.png")
-        """
+        #         ax.set_xlim(left=0)
+        #         ax.set_ylim(bottom=0)
+        #         ax.set_title(f'Squared Error, Epoch {i}')
+        #         ax.legend()
+        #         plt.savefig(testcase_dir + f"err_ep_{i}.png")
 
-        # arm history plots
-        n_arms = param_dict["n_arms"]
-        f, ax = plt.subplots(3, 2, figsize=(20, 30))
+        #     with open(testcase_dir + "err.json", "w") as f:
+        #         json.dump(err_logs, f, indent=4)
 
-        for ax_, label in zip(f.axes, a_hists.keys()):
-            bins = np.arange(n_arms+1) - 0.5
-            ax_.hist(a_hists[label].flatten(), bins=bins)
-            ax_.set_xticks(range(n_arms))
-            ax_.set_xlim(-1, n_arms)
-            ax_.set_title(label)
+        #     # by context
+        #     for j in range(n_contexts):
+        #         f, ax = plt.subplots(1, figsize=(20, 10))
+        #         for i in range(n_epochs):
+        #             ax.plot(x, err_hists[i, j][x],
+        #                     label=f"ep {i}", color=f'C{i+1}')
+        #             if label == "PartitionedAgent" and t_splits[i] is not None:
+        #                 ax.axvline(x=t_splits[i], color=f'C{i+1}',
+        #                         label=f'split time ep {i}')
+        #         ax.set_xlim(left=0)
+        #         ax.set_ylim(bottom=0)
+        #         ax.set_title(f'Squared Error, Context {j}')
+        #         ax.legend()
+        #         plt.savefig(testcase_dir + f"err_c_{j}.png")
 
-            # tikz.save(out_dir + f"tex/{testcase}_a_hist.tex")
-            plt.savefig(testcase_dir + f"a_hist.png")
+        # # arm history plots
+        # n_arms = param_dict["n_arms"]
+        # f, ax = plt.subplots(3, 2, figsize=(20, 30))
 
-            f, ax = plt.subplots(3, 2, figsize=(20, 30))
-            for ax_, label in zip(f.axes, a_hists.keys()):
-                bins = np.arange(n_arms+1) - 0.5
-                ax_.plot(a_hists[label][-1, :])
-                ax_.set_title(label)
+        # for ax_, label in zip(f.axes, a_hists.keys()):
+        #     bins = np.arange(n_arms+1) - 0.5
+        #     ax_.hist(a_hists[label].flatten(), bins=bins)
+        #     ax_.set_xticks(range(n_arms))
+        #     ax_.set_xlim(-1, n_arms)
+        #     ax_.set_title(label)
 
-            # tikz.save(out_folder + f"tex/{testcase_id}_a_hist_temp.tex")
-            plt.savefig(testcase_dir + f"a_hist_temp.png")
+        #     plt.savefig(testcase_dir + f"a_hist.png")
+
+        #     f, ax = plt.subplots(3, 2, figsize=(20, 30))
+        #     for ax_, label in zip(f.axes, a_hists.keys()):
+        #         bins = np.arange(n_arms+1) - 0.5
+        #         ax_.plot(a_hists[label][-1, :])
+        #         ax_.set_title(label)
+
+        #     plt.savefig(testcase_dir + f"a_hist_temp.png")

@@ -46,8 +46,6 @@ class Clairvoyant(Agent):
         self.t += 1
 
 #  TODO refactor or delete
-
-
 class UCB1Agent(Agent):
     def __init__(self, arms, n_contexts, max_reward=1):
         super().__init__(arms, n_contexts)

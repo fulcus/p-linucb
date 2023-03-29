@@ -21,7 +21,7 @@ def vertex_arms(dim_arm, max_a):
 
 def main(args):
     lmbd = 1
-    n_contexts = 10
+    n_contexts = 11
     k = 2  # global dim
     max_th = 3
     max_th_p = 3
@@ -80,9 +80,10 @@ def main(args):
     }
 
     filename = f"{args.armlen}_{args.context_distr}_{args.seed}.json"
-    out_folder = 'clustering_bandits/test/input/'
-    os.makedirs(out_folder, exist_ok=True)
-    with open(out_folder + filename, "w") as f:
+    input_folder = f'clustering_bandits/test/input/simulation_{args.seed}/'
+    os.makedirs(input_folder, exist_ok=True)
+    print(os.path.join(input_folder, filename))
+    with open(os.path.join(input_folder, filename), "w") as f:
         json.dump(params, f, indent=4)
     print(f"Generated {filename}")
 
