@@ -36,8 +36,9 @@ if __name__ == '__main__':
         testcase, _ = testcase.split('.')
         testcase_dir = os.path.join(out_dir, testcase)
         os.makedirs(testcase_dir, exist_ok=True)
-        logging.basicConfig(filename=os.path.join(testcase_dir, 'logs.log'),
+        logging.basicConfig(filename=os.path.join(out_dir, f'sim_{args.sim_id}.log'),
                             filemode='w', level=logging.INFO)
+        logging.log(logging.INFO, f"testcase {testcase}")
 
         # list to np.ndarray
         for k, v in param_dict.items():
@@ -71,7 +72,7 @@ if __name__ == '__main__':
                             k=param_dict["k"])
         core = Core(env, agent)
         # rewards, arms
-        print(f"Clairvoyant")
+        print("Clairvoyant")
         clairvoyant_logs, a_hists['Clairvoyant'], _, _ = core.simulation(
             n_epochs=param_dict['n_epochs'], n_rounds=param_dict["horizon"])
         # Reward upper bound
@@ -232,8 +233,6 @@ if __name__ == '__main__':
         first_log = next(iter(delta_regret.values()))
         x[-1] = min(x[-1], len(np.mean(np.cumsum(first_log.T, axis=0), axis=1))-1)
         f, ax = plt.subplots(1, figsize=(20, 10))
-        n_epochs = param_dict['n_epochs']
-        sqrtn = np.sqrt(n_epochs)
         for i, label in enumerate(delta_regret.keys()):
             # one plot per epoch
             # for j in range(n_epochs):
@@ -248,9 +247,9 @@ if __name__ == '__main__':
             # if n_epochs > 1:
             # mean and std
             ax.plot(x, np.mean(delta_regret[label].T, axis=1)
-                       [x], label=label, color=f'C{i+1}')
+                    [x], label=label, color=f'C{i+1}')
             ax.fill_between(x, np.mean(delta_regret[label].T, axis=1)[x]-np.std(delta_regret[label].T, axis=1)[x]/sqrtn,
-                               np.mean(delta_regret[label].T, axis=1)[x]+np.std(delta_regret[label].T, axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+1}')
+                            np.mean(delta_regret[label].T, axis=1)[x]+np.std(delta_regret[label].T, axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+1}')
             # cumulative
             # ax.plot(x, np.mean(np.cumsum(delta_regret[label].T, axis=0), axis=1)[
             #         x], label=f"{label}", color=f'C{i+n_epochs+1}')
@@ -260,8 +259,23 @@ if __name__ == '__main__':
         # ax.set_ylim(bottom=0)
         ax.set_title('Instanteneous Delta Regret')
         ax.legend()
-
         plt.savefig(os.path.join(testcase_dir, f"delta_regret_{testcase}.png"))
+
+        f, ax = plt.subplots(1, figsize=(20, 10))
+        # individual epochs regret
+        for i, label in enumerate(regret.keys()):
+            # one plot per epoch
+            for j in range(n_epochs):
+                ax.plot(x, np.cumsum(regret[label][j].T, axis=0)[x],
+                        label=f"{label} ep {j}", color=f'C{n_epochs+i+j+1}')
+                if label.startswith("PartitionedAgent") and t_splits[label][j] is not None:
+                    # ax.set_xlim(left=t_splits[label][j])
+                    # ax.set_ylim(bottom=85000)
+                    ax.axvline(
+                        x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')
+        ax.set_title('Cumulative Regret by Epoch')
+        ax.legend()
+        plt.savefig(os.path.join(testcase_dir, "epoch_regret.png"))
 
         # Error plots
 

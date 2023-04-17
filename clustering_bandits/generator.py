@@ -23,47 +23,47 @@ def main(args):
     lmbd = 1
     n_contexts = 11
     k = 2  # global dim
-    max_th = 3
-    max_th_p = 3
-    max_a = 3
+    max_th_g = 3
+    max_th_l = 3
+    max_a = 1
 
     arm_dim_max = 5
     local_dim_max = arm_dim_max - k
     n_arms = 2 ** arm_dim_max  # vertices
 
-    theta = np.random.randint(-max_th, max_th, size=(1, k)).round(2).tolist()
+    theta_g = np.random.randint(0, max_th_g, size=(1, k)).round(2).tolist()
     if args.armlen == "difflen":
-        theta_p = []
+        theta_l = []
         arms = []
         for _ in range(n_contexts):
             arm_len = np.random.randint(k+1, arm_dim_max)
             loc_dim = arm_len - k
             arms_agent = vertex_arms(arm_len, max_a)
             arms.append(arms_agent)
-            theta_p_i = np.random.randint(-max_th_p, max_th_p,
+            theta_l_i = np.random.randint(0, max_th_l,
                                           size=loc_dim).tolist()
-            theta_p.append(theta_p_i)
+            theta_l.append(theta_l_i)
     else:
-        theta_p = np.random.randint(-max_th_p, max_th_p,
+        theta_l = np.random.randint(0, max_th_l,
                                     size=(n_contexts, local_dim_max)).tolist()
         arms_agent = vertex_arms(arm_dim_max, max_a)
         arms = [arms_agent for _ in range(n_contexts)]
 
-    max_theta_norm = vector_norm_bound(max_th, arm_dim_max)
-    max_theta_norm_local = vector_norm_bound(max_th, local_dim_max)
+    max_theta_norm = vector_norm_bound(max_th_g, arm_dim_max)
+    max_theta_norm_local = vector_norm_bound(max_th_l, local_dim_max)
     max_arm_norm = vector_norm_bound(max_a, arm_dim_max)
     max_arm_norm_local = vector_norm_bound(max_a, local_dim_max)
 
     params = {
         "horizon": 5000,
-        "n_epochs": 1,
-        "sigma": 0.1,
-        "seed": args.seed,
+        "n_epochs": 10,
+        "sigma": 1,
+        "seed": 0,
         "context_distr": args.context_distr,
         "popular_freq": None,
         "err_th": args.err_th,
-        "max_th": max_th,
-        "max_th_p": max_th_p,
+        "max_th": max_th_g,
+        "max_th_p": max_th_l,
         "max_a": max_a,
         "k": k,
         "arm_dim_max": arm_dim_max,
@@ -74,13 +74,13 @@ def main(args):
         "max_arm_norm_local": max_arm_norm_local,
         "max_theta_norm": max_theta_norm,
         "max_theta_norm_local": max_theta_norm_local,
-        "theta": theta,
-        "theta_p": theta_p,
+        "theta": theta_g,
+        "theta_p": theta_l,
         "arms": arms
     }
 
-    filename = f"{args.armlen}_{args.context_distr}_{args.seed}.json"
-    input_folder = f'clustering_bandits/test/input/simulation_{args.seed}/'
+    filename = f"{args.armlen}_{args.context_distr}_{np.random.randint(1,1000)}.json"
+    input_folder = f'clustering_bandits/test/input/simulation_{args.sim}/'
     os.makedirs(input_folder, exist_ok=True)
     print(os.path.join(input_folder, filename))
     with open(os.path.join(input_folder, filename), "w") as f:
@@ -92,8 +92,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         prog='generator',
         description='generates test cases')
-    parser.add_argument('-s', '--seed', type=int,
-                        default=np.random.randint(0, 1000))
+    parser.add_argument('-s', '--sim', type=int,
+                        default=0)
     parser.add_argument('-a', '--armlen', type=str, choices=["difflen", "eqlen"],
                         default="eqlen")
     parser.add_argument('-c', '--context_distr', type=str, choices=["uniform", "long_tail", "round_robin"],

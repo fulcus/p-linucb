@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from abc import ABC, abstractmethod
 
@@ -12,13 +13,17 @@ class Environment(ABC):
         self.sigma = sigma
         self.random_state = random_state
         self.context_distr = context_distr
-        self.popular_freq = popular_freq
-
         self.t = 0
         self.noise = None
         self.curr_index = None
         self.context_indexes = np.arange(self.n_contexts)
         self.rewards = []
+        
+        if popular_freq:
+            long_tail_p = (1 - popular_freq) / (self.n_contexts - 1)
+            self.p = [popular_freq] + [long_tail_p] * (self.n_contexts - 1)
+            logging.log(logging.INFO, "context_distr: %s", self.p)
+
         self.reset(0)
 
     @abstractmethod
@@ -27,15 +32,10 @@ class Environment(ABC):
 
     def get_context(self):
         if self.context_distr == "uniform":
-            # np.random.seed(self.random_state)
             self.curr_index = np.random.choice(
-                self.context_indexes, size=1)
+                self.context_indexes)
         elif self.context_distr == "long_tail":
-            long_tail_p = (1 - self.popular_freq) / (self.n_contexts - 1)
-            p = [self.popular_freq] + [long_tail_p] * (self.n_contexts - 1)
-            print(p)
-            # np.random.seed(self.random_state + self.t)
-            self.curr_index = np.random.choice(self.context_indexes, p=p)
+            self.curr_index = np.random.choice(self.context_indexes, p=self.p)
         else:  # round robin
             self.curr_index = self.t % self.n_contexts
         return self.curr_index
