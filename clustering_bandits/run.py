@@ -222,10 +222,11 @@ if __name__ == '__main__':
                     x], label=f"{label} mean", color=f'C{i+n_epochs+1}')
             ax.fill_between(x, np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]-np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn,
                             np.mean(np.cumsum(regret[label].T, axis=0), axis=1)[x]+np.std(np.cumsum(regret[label].T, axis=0), axis=1)[x]/sqrtn, alpha=0.3, color=f'C{i+n_epochs+1}')
+            logging.log(logging.INFO, f"std {label}: {np.std(np.sum(regret[label].T, axis=0))}")
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         ax.set_title('Cumulative Regret')
-        ax.legend()
+        ax.legend(fontsize="xx-large")
         plt.savefig(os.path.join(testcase_dir, f"regret_{testcase}.png"))
 
         # delta regrets
@@ -258,7 +259,7 @@ if __name__ == '__main__':
         ax.set_xlim(left=0)
         # ax.set_ylim(bottom=0)
         ax.set_title('Instanteneous Delta Regret')
-        ax.legend()
+        ax.legend(fontsize="xx-large")
         plt.savefig(os.path.join(testcase_dir, f"delta_regret_{testcase}.png"))
 
         f, ax = plt.subplots(1, figsize=(20, 10))
@@ -274,7 +275,7 @@ if __name__ == '__main__':
                     ax.axvline(
                         x=t_splits[label][j], color=f'C{n_epochs+i+j+1}', label=f'split time ep {j}')
         ax.set_title('Cumulative Regret by Epoch')
-        ax.legend()
+        ax.legend(fontsize="xx-large")
         plt.savefig(os.path.join(testcase_dir, "epoch_regret.png"))
 
         # Error plots
