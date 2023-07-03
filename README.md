@@ -1,6 +1,8 @@
 ## Partitioned Linear Bandit Algorithm
 
-This repository contains the implementation of the Partitioned Linear Bandit (P-LinUCB) algorithm. P-LinUCB is designed to solve the partitioned linear bandit problem, a special case of the multi-agent linear bandit setting, where the bandit parameter consists of shared global components and local components specific to each bandit instance. This algorithm leverages this partitioning to learn the global components using data from all bandit instances, while learning the local components separately.
+This repository contains the implementation of the Partitioned Linear Bandit (P-LinUCB) algorithm. P-LinUCB is designed to solve the partitioned linear bandit problem, a special case of the multi-agent linear bandit setting, where the bandit parameter consists of shared global components and local components specific to each bandit instance. This algorithm leverages this partitioning to learn the global components using data from all bandit instances, while learning the local components separately. 
+
+To learn more about the research check out the [executive summary](https://github.com/fulcus/p-linucb/blob/master/Executive_Summary.pdf).
 
 ### Partitioned Linear Setting
 The partitioned setting in the linear bandit problem involves decomposing the bandit parameter into shared and local components. The shared components are common across all bandits, while the local components are specific to each bandit instance. At each time step, an agent chooses an arm and observes a reward generated based on the shared and local components. The algorithm aims to learn both the shared and local components to optimize the cumulative reward.
